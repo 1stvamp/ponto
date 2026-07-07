@@ -11,8 +11,10 @@ import (
 	tfjson "github.com/hashicorp/terraform-json"
 )
 
-type Action string
-type ResourceType string
+type (
+	Action       string
+	ResourceType string
+)
 
 const (
 	ResourceTypeFile     ResourceType = "file"

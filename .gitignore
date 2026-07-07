@@ -1,4 +1,7 @@
 build/rover
+# Root-level compiled binaries from `go build` verification runs
+/rover
+/ponto
 .DS_Store
 rover.zip
 plan.out
