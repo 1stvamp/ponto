@@ -1,9 +1,9 @@
-build/rover
+build/ponto
 # Root-level compiled binaries from `go build` verification runs
 /rover
 /ponto
 .DS_Store
-rover.zip
+ponto.zip
 plan.out
 
 # Ignore generated terraform files
@@ -12,3 +12,5 @@ plan.out
 .idea/
 
 build/
+
+.dist/

@@ -1,43 +1,48 @@
-# Prep base stage
+# syntax=docker/dockerfile:1
+
+ARG NODE_VERSION=20
+ARG GO_VERSION=1.23
 ARG TF_VERSION=1.5.5
 
-# Build ui
-FROM node:20-alpine as ui
+# Build UI
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS ui
 WORKDIR /src
-# Copy specific package files
-COPY ./ui/package-lock.json ./
-COPY ./ui/package.json ./
+COPY ./ui/package*.json ./
 COPY ./ui/babel.config.js ./
-# Set Progress, Config and install
 RUN npm set progress=false && npm config set depth 0 && npm install
-# Copy source
-# Copy Specific Directories
 COPY ./ui/public ./public
 COPY ./ui/src ./src
-# build (to dist folder)
 RUN NODE_OPTIONS='--openssl-legacy-provider' npm run build
 
-# Build rover
-FROM golang:1.21 AS rover
+# Build the ponto binary
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS build
+ENV CGO_ENABLED=0
 WORKDIR /src
-# Copy full source
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
-# Copy ui/dist from ui stage as it needs to embedded
-COPY --from=ui ./src/dist ./ui/dist
-# Build rover
-RUN go get -d -v golang.org/x/net/html
-RUN CGO_ENABLED=0 GOOS=linux go build -o rover .
+COPY --from=ui /src/dist ./ui/dist
+ARG TARGETOS TARGETARCH
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w" -o /out/ponto .
 
-# Release stage
-FROM hashicorp/terraform:$TF_VERSION AS release
+# UPX-compress the binary for the slim image
+FROM build AS build-slim
+RUN apk add --no-cache upx && upx -q --best /out/ponto
 
-# Copy rover binary
-COPY --from=rover /src/rover /bin/rover
-RUN chmod +x /bin/rover
-
-# Install Google Chrome
-RUN apk add chromium
-
+# Standard image: terraform base + chromium (supports -genImage)
+FROM hashicorp/terraform:${TF_VERSION} AS standard
+RUN apk add --no-cache chromium ca-certificates
+COPY --from=build /out/ponto /bin/ponto
 WORKDIR /src
+ENTRYPOINT ["/bin/ponto"]
 
-ENTRYPOINT [ "/bin/rover" ]
+# Slim image: scratch + UPX'd terraform and ponto (no chromium; no -genImage)
+FROM hashicorp/terraform:${TF_VERSION} AS tf-slim
+RUN apk add --no-cache upx && cp /bin/terraform /terraform && upx -q --best /terraform
+
+FROM scratch AS slim
+COPY --from=standard /etc/ssl/certs/ /etc/ssl/certs/
+COPY --from=tf-slim /terraform /bin/terraform
+COPY --from=build-slim /out/ponto /bin/ponto
+WORKDIR /src
+ENTRYPOINT ["/bin/ponto"]
