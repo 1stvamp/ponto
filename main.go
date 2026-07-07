@@ -44,7 +44,7 @@ func (i *arrayFlags) Set(value string) error {
 	return nil
 }
 
-type rover struct {
+type ponto struct {
 	Name             string
 	WorkingDir       string
 	TfPath           string
@@ -71,9 +71,9 @@ func main() {
 	var tfVarsFiles, tfVars, tfBackendConfigs arrayFlags
 	flag.StringVar(&tfPath, "tfPath", "/bin/terraform", "Path to Terraform binary")
 	flag.StringVar(&workingDir, "workingDir", ".", "Path to Terraform configuration")
-	flag.StringVar(&name, "name", "rover", "Configuration name")
-	flag.StringVar(&zipFileName, "zipFileName", "rover", "Standalone zip file name")
-	flag.StringVar(&ipPort, "ipPort", "0.0.0.0:9000", "IP and port for Rover server")
+	flag.StringVar(&name, "name", "ponto", "Configuration name")
+	flag.StringVar(&zipFileName, "zipFileName", "ponto", "Standalone zip file name")
+	flag.StringVar(&ipPort, "ipPort", "0.0.0.0:9000", "IP and port for Ponto server")
 	flag.StringVar(&planPath, "planPath", "", "Plan file path")
 	flag.StringVar(&planJSONPath, "planJSONPath", "", "Plan JSON file path")
 	flag.StringVar(&workspaceName, "workspaceName", "", "Workspace name")
@@ -90,11 +90,11 @@ func main() {
 	flag.Parse()
 
 	if getVersion {
-		fmt.Printf("Rover v%s\n", VERSION)
+		fmt.Printf("Ponto v%s\n", VERSION)
 		return
 	}
 
-	log.Println("Starting Rover...")
+	log.Println("Starting Ponto...")
 
 	parsedTfVarsFiles := strings.Split(tfVarsFiles.String(), ",")
 	parsedTfVars := strings.Split(tfVars.String(), ",")
@@ -117,7 +117,7 @@ func main() {
 		}
 	}
 
-	r := rover{
+	r := ponto{
 		Name:             name,
 		WorkingDir:       workingDir,
 		TfPath:           tfPath,
@@ -177,7 +177,7 @@ func main() {
 
 }
 
-func (r *rover) generateAssets() error {
+func (r *ponto) generateAssets() error {
 	// Get Plan
 	err := r.getPlan()
 	if err != nil {
@@ -203,8 +203,8 @@ func (r *rover) generateAssets() error {
 	return nil
 }
 
-func (r *rover) getPlan() error {
-	tmpDir, err := os.MkdirTemp("", "rover")
+func (r *ponto) getPlan() error {
+	tmpDir, err := os.MkdirTemp("", "ponto")
 	if err != nil {
 		return err
 	}
@@ -292,7 +292,7 @@ func (r *rover) getPlan() error {
 			return errors.New(fmt.Sprintf("Did not create new run. %s in %s in %s is still active", run.ID, r.TFCWorkspaceName, r.TFCOrgName))
 		}
 
-		// If latest run is not actionable, rover will create new run
+		// If latest run is not actionable, ponto will create new run
 		if r.TFCNewRun {
 			// Create new run in specified TFC workspace
 			newRun, err := client.Runs.Create(context.Background(), tfe.RunCreateOptions{
@@ -377,7 +377,7 @@ func (r *rover) getPlan() error {
 	}
 
 	log.Println("Generating plan...")
-	planPath := fmt.Sprintf("%s/%s-%v", tmpDir, "roverplan", time.Now().Unix())
+	planPath := fmt.Sprintf("%s/%s-%v", tmpDir, "pontoplan", time.Now().Unix())
 
 	// Create TF Plan options
 	var tfPlanOptions []tfexec.PlanOption

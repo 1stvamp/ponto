@@ -54,7 +54,7 @@ type ModuleLocation struct {
 // PopulateModuleLocations Parses the modules.json file in the .terraform folder, if it exists
 // The module locations are then added to rso.Locations and referenced when loading
 // modules from the filesystem with tfconfig.LoadModule
-func (r *rover) PopulateModuleLocations(moduleJSONFile string, locations map[string]string) {
+func (r *ponto) PopulateModuleLocations(moduleJSONFile string, locations map[string]string) {
 
 	moduleLocations := ModuleLocations{}
 
@@ -77,7 +77,7 @@ func (r *rover) PopulateModuleLocations(moduleJSONFile string, locations map[str
 	}
 }
 
-func (r *rover) PopulateConfigs(parent string, parentKey string, rso *ResourcesOverview, config *tfjson.ConfigModule) {
+func (r *ponto) PopulateConfigs(parent string, parentKey string, rso *ResourcesOverview, config *tfjson.ConfigModule) {
 
 	ml := rso.Locations
 	rc := rso.Configs
@@ -154,7 +154,7 @@ func (r *rover) PopulateConfigs(parent string, parentKey string, rso *ResourcesO
 	}
 }
 
-func (r *rover) PopulateModuleState(rso *ResourcesOverview, module *tfjson.StateModule, prior bool) {
+func (r *ponto) PopulateModuleState(rso *ResourcesOverview, module *tfjson.StateModule, prior bool) {
 	childIndex := regexp.MustCompile(`\[[^[\]]*\]$`)
 
 	rs := rso.States
@@ -263,7 +263,7 @@ func (r *rover) PopulateModuleState(rso *ResourcesOverview, module *tfjson.State
 
 // GenerateResourceOverview - Overview of files and their resources
 // Groups different resource types together
-func (r *rover) GenerateResourceOverview() error {
+func (r *ponto) GenerateResourceOverview() error {
 	log.Println("Generating resource overview...")
 
 	matchBrackets := regexp.MustCompile(`\[[^\[\]]*\]`)

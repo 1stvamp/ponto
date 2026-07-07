@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-func (r *rover) generateZip(fe fs.FS, filename string) error {
+func (r *ponto) generateZip(fe fs.FS, filename string) error {
 	newZipFile, err := os.Create(filename)
 	if err != nil {
 		return err

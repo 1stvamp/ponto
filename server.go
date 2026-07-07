@@ -12,7 +12,7 @@ import (
 	// tfjson "github.com/hashicorp/terraform-json"
 )
 
-func (ro *rover) startServer(ipPort string, frontendFS http.Handler) error {
+func (ro *ponto) startServer(ipPort string, frontendFS http.Handler) error {
 
 	m := http.NewServeMux()
 	s := http.Server{Addr: ipPort, Handler: m}
@@ -61,7 +61,7 @@ func (ro *rover) startServer(ipPort string, frontendFS http.Handler) error {
 		io.Copy(w, bytes.NewReader(j))
 	})
 
-	log.Printf("Rover is running on %s", ipPort)
+	log.Printf("Ponto is running on %s", ipPort)
 
 	l, err := net.Listen("tcp", ipPort)
 	if err != nil {
