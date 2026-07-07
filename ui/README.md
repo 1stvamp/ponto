@@ -1,4 +1,4 @@
-# Mercator UI
+# Ponto UI
 
 ## Project setup
 ```

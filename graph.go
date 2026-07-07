@@ -57,7 +57,7 @@ type EdgeData struct {
 }
 
 // GenerateGraph -
-func (r *rover) GenerateGraph() error {
+func (r *ponto) GenerateGraph() error {
 	log.Println("Generating resource graph...")
 
 	nodes := r.GenerateNodes()
@@ -88,7 +88,7 @@ func (r *rover) GenerateGraph() error {
 	return nil
 }
 
-func (r *rover) addNodes(base string, parent string, nodeMap map[string]Node, resources map[string]*Resource) []string {
+func (r *ponto) addNodes(base string, parent string, nodeMap map[string]Node, resources map[string]*Resource) []string {
 
 	nmo := []string{}
 
@@ -213,7 +213,7 @@ func (r *rover) addNodes(base string, parent string, nodeMap map[string]Node, re
 }
 
 // GenerateNodes -
-func (r *rover) GenerateNodes() []Node {
+func (r *ponto) GenerateNodes() []Node {
 
 	nodeMap := make(map[string]Node)
 	nmo := []string{}
@@ -245,7 +245,7 @@ func (r *rover) GenerateNodes() []Node {
 	return nodes
 }
 
-func (r *rover) addEdges(base string, parent string, edgeMap map[string]Edge, resources map[string]*Resource) []string {
+func (r *ponto) addEdges(base string, parent string, edgeMap map[string]Edge, resources map[string]*Resource) []string {
 	emo := []string{}
 	for id, re := range resources {
 		matchBrackets := regexp.MustCompile(`\[[^\[\]]*\]`)
@@ -332,7 +332,7 @@ func (r *rover) addEdges(base string, parent string, edgeMap map[string]Edge, re
 }
 
 // GenerateEdges -
-func (r *rover) GenerateEdges() []Edge {
+func (r *ponto) GenerateEdges() []Edge {
 	edgeMap := make(map[string]Edge)
 	emo := []string{}
 

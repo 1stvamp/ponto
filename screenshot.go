@@ -56,7 +56,7 @@ func screenshot(s *http.Server) {
 	}
 	<-downloadComplete
 
-	e := moveFile(fmt.Sprintf("%v/%v", os.TempDir(), downloadGUID), "./rover.svg")
+	e := moveFile(fmt.Sprintf("%v/%v", os.TempDir(), downloadGUID), "./ponto.svg")
 	if e != nil {
 		log.Fatal(e)
 	}

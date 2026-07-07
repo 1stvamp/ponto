@@ -1,8 +1,8 @@
 <template>
   <nav class="nav">
     <div class="nav-left">
-      <a class="title" href="https://github.com/im2nguyen/rover">
-        <h2>Rover - Terraform Visualizer</h2>
+      <a class="title" href="https://github.com/1stvamp/ponto">
+        <h2>Ponto - Terraform Visualizer</h2>
       </a>
     </div>
     <div class="nav-right">

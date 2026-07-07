@@ -51,7 +51,7 @@ c
           <!-- {{ resourceConfig }} -->
           <span
             v-if="
-              resourceConfig.isChild == 'rover-for-each-child-resource-true'
+              resourceConfig.isChild == 'ponto-for-each-child-resource-true'
             "
             class="is-child-resource"
             >Please check parent resource</span
@@ -177,7 +177,7 @@ export default {
 
       let config;
 
-      if (isChild) return { isChild: "rover-for-each-child-resource-true" };
+      if (isChild) return { isChild: "ponto-for-each-child-resource-true" };
 
       // If variable, return variable config
       if ((config = model.configs[configID]?.variable_config) !== undefined) {
@@ -202,7 +202,7 @@ export default {
 
       
       // Resource
-      /*if (isChild) return { isChild: "rover-for-each-child-resource-true" };
+      /*if (isChild) return { isChild: "ponto-for-each-child-resource-true" };
       if (model.resources[resourceID] && model.resources[resourceID].config) {
         let trc = {};
         if (model.resources[resourceID].config.for_each_expression) {

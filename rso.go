@@ -3,14 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/hashicorp/terraform-config-inspect/tfconfig"
-	tfjson "github.com/hashicorp/terraform-json"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/hashicorp/terraform-config-inspect/tfconfig"
+	tfjson "github.com/hashicorp/terraform-json"
 )
 
 // ResourcesOverview represents the root module
@@ -45,7 +46,7 @@ type ModuleLocations struct {
 }
 
 type ModuleLocation struct {
-	Key    string `json:"Key,omitempty""`
+	Key    string `json:"Key,omitempty"`
 	Source string `json:"Source,omitempty"`
 	Dir    string `json:"Dir,omitempty"`
 }
@@ -53,7 +54,7 @@ type ModuleLocation struct {
 // PopulateModuleLocations Parses the modules.json file in the .terraform folder, if it exists
 // The module locations are then added to rso.Locations and referenced when loading
 // modules from the filesystem with tfconfig.LoadModule
-func (r *rover) PopulateModuleLocations(moduleJSONFile string, locations map[string]string) {
+func (r *ponto) PopulateModuleLocations(moduleJSONFile string, locations map[string]string) {
 
 	moduleLocations := ModuleLocations{}
 
@@ -64,7 +65,7 @@ func (r *rover) PopulateModuleLocations(moduleJSONFile string, locations map[str
 	defer jsonFile.Close()
 
 	// read our opened jsonFile as a byte array.
-	byteValue, _ := ioutil.ReadAll(jsonFile)
+	byteValue, _ := io.ReadAll(jsonFile)
 
 	// we unmarshal our byteArray which contains our
 	// jsonFile's content into 'users' which we defined above
@@ -76,7 +77,7 @@ func (r *rover) PopulateModuleLocations(moduleJSONFile string, locations map[str
 	}
 }
 
-func (r *rover) PopulateConfigs(parent string, parentKey string, rso *ResourcesOverview, config *tfjson.ConfigModule) {
+func (r *ponto) PopulateConfigs(parent string, parentKey string, rso *ResourcesOverview, config *tfjson.ConfigModule) {
 
 	ml := rso.Locations
 	rc := rso.Configs
@@ -153,7 +154,7 @@ func (r *rover) PopulateConfigs(parent string, parentKey string, rso *ResourcesO
 	}
 }
 
-func (r *rover) PopulateModuleState(rso *ResourcesOverview, module *tfjson.StateModule, prior bool) {
+func (r *ponto) PopulateModuleState(rso *ResourcesOverview, module *tfjson.StateModule, prior bool) {
 	childIndex := regexp.MustCompile(`\[[^[\]]*\]$`)
 
 	rs := rso.States
@@ -262,7 +263,7 @@ func (r *rover) PopulateModuleState(rso *ResourcesOverview, module *tfjson.State
 
 // GenerateResourceOverview - Overview of files and their resources
 // Groups different resource types together
-func (r *rover) GenerateResourceOverview() error {
+func (r *ponto) GenerateResourceOverview() error {
 	log.Println("Generating resource overview...")
 
 	matchBrackets := regexp.MustCompile(`\[[^\[\]]*\]`)

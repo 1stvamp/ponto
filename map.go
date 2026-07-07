@@ -11,8 +11,10 @@ import (
 	tfjson "github.com/hashicorp/terraform-json"
 )
 
-type Action string
-type ResourceType string
+type (
+	Action       string
+	ResourceType string
+)
 
 const (
 	ResourceTypeFile     ResourceType = "file"
@@ -83,7 +85,7 @@ type ModuleCall struct {
 	Line    int    `json:"line,omitempty"`
 }
 
-func (r *rover) GenerateModuleMap(parent *Resource, parentModule string) {
+func (r *ponto) GenerateModuleMap(parent *Resource, parentModule string) {
 
 	childIndex := regexp.MustCompile(`\[[^[\]]*\]$`)
 	matchBrackets := regexp.MustCompile(`\[[^\[\]]*\]`)
@@ -300,7 +302,7 @@ func (r *rover) GenerateModuleMap(parent *Resource, parentModule string) {
 	}
 }
 
-func (r *rover) AddFileIfNotExists(module *Resource, parentModule string, fname string) {
+func (r *ponto) AddFileIfNotExists(module *Resource, parentModule string, fname string) {
 
 	if _, ok := module.Children[fname]; !ok {
 
@@ -316,7 +318,7 @@ func (r *rover) AddFileIfNotExists(module *Resource, parentModule string, fname 
 // Generates Map - Overview of files and their resources
 // Groups different resource types together
 // Defaults to config
-func (r *rover) GenerateMap() error {
+func (r *ponto) GenerateMap() error {
 	log.Println("Generating resource map...")
 
 	// Root module
@@ -328,7 +330,7 @@ func (r *rover) GenerateMap() error {
 	}
 
 	mapObj := &Map{
-		Path: "Rover Visualization",
+		Path: "Ponto Visualization",
 		Root: rootModule.Children,
 	}
 

@@ -3,6 +3,6 @@
 .github
 docs
 example
-rover
+ponto
 **/node_modules
 **/dist
