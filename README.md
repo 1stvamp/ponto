@@ -1,26 +1,24 @@
-## Rover - Terraform Visualizer
+# Ponto - Terraform Visualizer
 
-Rover is a [Terraform](http://terraform.io/) visualizer.
+Ponto is a [Terraform](http://terraform.io/) visualizer. It is a fork of the
+excellent but abandoned [Rover](https://github.com/im2nguyen/rover) by Nguyen
+Nguyen and contributors, released under the MIT license (see `LICENSE`).
 
-In order to do this, Rover:
+In order to do this, Ponto:
 
 1. generates a [`plan`](https://www.terraform.io/docs/cli/commands/plan.html#out-filename) file and parses the configuration in the root directory or uses a provided plan.
 1. parses the `plan` and configuration files to generate three items: the resource overview (`rso`), the resource map (`map`), and the resource graph (`graph`).
 1. consumes the `rso`, `map`, and `graph` to generate an interactive configuration and state visualization hosts on `0.0.0.0:9000`.
 
-Feedback (via issues) and pull requests are appreciated!
-
-![Rover Screenshot](docs/rover-cropped-screenshot.png)
-
 ## Quickstart
 
-The fastest way to get up and running with Rover is through Docker.
+The fastest way to get up and running with Ponto is through Docker.
 
-Run the following command in any Terraform workspace to generate a visualization. This command copies all the files in your current directory to the Rover container and exposes port `:9000`.
+Run the following command in any Terraform workspace to generate a visualization. This command copies all the files in your current directory to the Ponto container and exposes port `:9000`.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v $(pwd):/src im2nguyen/rover
-2021/07/02 06:46:23 Starting Rover...
+$ docker run --rm -it -p 9000:9000 -v $(pwd):/src ghcr.io/1stvamp/ponto
+2021/07/02 06:46:23 Starting Ponto...
 2021/07/02 06:46:23 Initializing Terraform...
 2021/07/02 06:46:24 Generating plan...
 2021/07/02 06:46:25 Parsing configuration...
@@ -28,14 +26,14 @@ $ docker run --rm -it -p 9000:9000 -v $(pwd):/src im2nguyen/rover
 2021/07/02 06:46:25 Generating resource map...
 2021/07/02 06:46:25 Generating resource graph...
 2021/07/02 06:46:25 Done generating assets.
-2021/07/02 06:46:25 Rover is running on 0.0.0.0:9000
+2021/07/02 06:46:25 Ponto is running on 0.0.0.0:9000
 ```
 
-Once Rover runs on `0.0.0.0:9000`, navigate to it to find the visualization!
+Once Ponto runs on `0.0.0.0:9000`, navigate to it to find the visualization!
 
 ### Run on Terraform plan file
 
-Use `-planJSONPath` to start Rover on Terraform plan file. The `plan.json` file should be in Linux version - Unix (LF), UTF-8.
+Use `-planJSONPath` to start Ponto on Terraform plan file. The `plan.json` file should be in Linux version - Unix (LF), UTF-8.
 
 First, generate the plan file in JSON format.
 
@@ -44,21 +42,21 @@ $ terraform plan -out plan.out
 $ terraform show -json plan.out > plan.json
 ```
 
-Then, run Rover on it.
+Then, run Ponto on it.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v $(pwd)/plan.json:/src/plan.json im2nguyen/rover:latest -planJSONPath=plan.json
+$ docker run --rm -it -p 9000:9000 -v $(pwd)/plan.json:/src/plan.json ghcr.io/1stvamp/ponto:latest -planJSONPath=plan.json
 ```
 
 ### Standalone mode
 
-Standalone mode generates a `rover.zip` file containing all the static assets.
+Standalone mode generates a `ponto.zip` file containing all the static assets.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" im2nguyen/rover -standalone true
+$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" ghcr.io/1stvamp/ponto -standalone true
 ```
 
-After all the assets are generated, unzip `rover.zip` and open `rover/index.html` in your favourite web browser.
+After all the assets are generated, unzip `ponto.zip` and open `ponto/index.html` in your favourite web browser.
 
 ### Set environment variables
 
@@ -71,7 +69,7 @@ $ printenv | grep "AWS" > .env
 Then, add it as environment variables to your Docker container with `--env-file`.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" --env-file ./.env im2nguyen/rover
+$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" --env-file ./.env ghcr.io/1stvamp/ponto
 ```
 
 ### Define tfbackend, tfvars and Terraform variables
@@ -79,7 +77,7 @@ $ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" --env-file ./.env im2nguyen/
 Use `-tfBackendConfig` to define backend config files and `-tfVarsFile` or `-tfVar` to define variables. For example, you can run the following in the `example/random-test` directory to overload variables.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" im2nguyen/rover -tfBackendConfig test.tfbackend -tfVarsFile test.tfvars -tfVar max_length=4
+$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" ghcr.io/1stvamp/ponto -tfBackendConfig test.tfbackend -tfVarsFile test.tfvars -tfVar max_length=4
 ```
 
 ### Image generation
@@ -87,20 +85,18 @@ $ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" im2nguyen/rover -tfBackendCo
 Use `-genImage` to generate and save the visualization as a SVG image.
 
 ```
-$ docker run --rm -it  -v "$(pwd):/src" im2nguyen/rover -genImage true
+$ docker run --rm -it  -v "$(pwd):/src" ghcr.io/1stvamp/ponto -genImage true
 ```
+
+Image generation needs chromium, which is only in the standard image. The `:slim` image cannot generate images (see below).
 
 ## Installation
 
-You can download Rover binary specific to your system by visiting the [Releases page](https://github.com/im2nguyen/rover/releases). Download the binary, unzip, then move `rover` into your `PATH`.
-
-- [rover zip — MacOS - intel](https://github.com/im2nguyen/rover/releases/download/v0.3.2/rover_0.3.2_darwin_amd64.zip)
-- [rover zip — MacOS - Apple Silicon](https://github.com/im2nguyen/rover/releases/download/v0.3.2/rover_0.3.2_darwin_arm64.zip)
-- [rover zip — Windows](https://github.com/im2nguyen/rover/releases/download/v0.3.2/rover_0.3.2_windows_amd64.zip)
+You can download the Ponto binary specific to your system from the [Releases page](https://github.com/1stvamp/ponto/releases). Download the binary, unzip, then move `ponto` into your `PATH`.
 
 ### Build from source
 
-You can build Rover manually by cloning this repository, then building the frontend and compiling the binary. It requires Go v1.21+ and `npm`.
+You can build Ponto manually by cloning this repository, then building the frontend and compiling the binary. It requires Go v1.23+ and `npm`.
 
 #### Build frontend
 
@@ -136,19 +132,18 @@ Compile and install the binary. Alternatively, you can use `go build` and move t
 $ go install
 ```
 
-### Build Docker image
+### Build the Docker image
 
-First, compile the binary for `linux/amd64`.
-
-```
-$ env GOOS=linux GOARCH=amd64 go build .
-```
-
-Then, build the Docker image.
+Ponto's images are built with [Docker Buildx Bake](docker-bake.hcl); the bake file compiles the frontend and binary internally, so you do not need to build them first. To build the standard image locally:
 
 ```
-$ docker build . -t im2nguyen/rover --no-cache
+$ docker buildx bake image-local
 ```
+
+This produces `ghcr.io/1stvamp/ponto:latest`. There are two image variants:
+
+- `ghcr.io/1stvamp/ponto` (standard): Alpine based, includes chromium so `-genImage` works.
+- `ghcr.io/1stvamp/ponto:slim`: a much smaller `scratch` image with ponto and terraform compressed by [UPX](https://github.com/upx/upx). It has no chromium, so `-genImage` is not available. Build it with `docker buildx bake image-slim`.
 
 
 ## Basic usage
@@ -161,11 +156,11 @@ Navigate into `random-test` example configuration. This directory contains confi
 $ cd example/random-test
 ```
 
-Run Rover. Rover will start running in the current directory and assume the Terraform binary lives in `/usr/local/bin/terraform` by default.
+Run Ponto. Ponto will start running in the current directory and assume the Terraform binary lives in `/bin/terraform` by default. Use `-tfPath` to point at a different location.
 
 ```
-$ rover
-2021/06/23 22:51:27 Starting Rover...
+$ ponto
+2021/06/23 22:51:27 Starting Ponto...
 2021/06/23 22:51:27 Initializing Terraform...
 2021/06/23 22:51:28 Generating plan...
 2021/06/23 22:51:28 Parsing configuration...
@@ -173,13 +168,13 @@ $ rover
 2021/06/23 22:51:28 Generating resource map...
 2021/06/23 22:51:28 Generating resource graph...
 2021/06/23 22:51:28 Done generating assets.
-2021/06/23 22:51:28 Rover is running on 0.0.0.0:9000
+2021/06/23 22:51:28 Ponto is running on 0.0.0.0:9000
 ```
 
 You can specify the working directory (where your configuration is living) and the Terraform binary location using flags.
 
 ```
-$ rover -workingDir "example/eks-cluster" -tfPath "/Users/dos/terraform"
+$ ponto -workingDir "example/eks-cluster" -tfPath "/Users/dos/terraform"
 ```
 
-Once Rover runs on `0.0.0.0:9000`, navigate to it to find the visualization!
+Once Ponto runs on `0.0.0.0:9000`, navigate to it to find the visualization!
