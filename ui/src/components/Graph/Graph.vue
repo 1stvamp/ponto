@@ -484,7 +484,7 @@ export default {
       let cy = this.$refs.cy.instance;
       var svgContent = cy.svg({scale: 0.1, full: true});
 			var blob = new Blob([svgContent], {type:"image/svg+xml;charset=utf-8"});
-			saveAs(blob, "rover.svg");
+			saveAs(blob, "ponto.svg");
 			
     },
     runLayouts: function () {
