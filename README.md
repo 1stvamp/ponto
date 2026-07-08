@@ -31,6 +31,12 @@ $ docker run --rm -it -p 9000:9000 -v $(pwd):/src ghcr.io/1stvamp/ponto
 2021/07/02 06:46:25 Ponto is running on 0.0.0.0:9000
 ```
 
+Or run it natively in a Terraform workspace, with `ponto` on your `PATH` (see [Installation](#installation)) and `terraform` or `tofu` available:
+
+```shell
+$ ponto
+```
+
 Once Ponto runs on `0.0.0.0:9000`, navigate to it to find the visualization!
 
 ### Run on Terraform plan file
@@ -50,12 +56,24 @@ Then, run Ponto on it.
 $ docker run --rm -it -p 9000:9000 -v $(pwd)/plan.json:/src/plan.json ghcr.io/1stvamp/ponto:latest --plan-json-path=plan.json
 ```
 
+Or natively:
+
+```shell
+$ ponto --plan-json-path plan.json
+```
+
 ### Standalone mode
 
 Standalone mode generates a `ponto.zip` file containing all the static assets.
 
 ```
 $ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" ghcr.io/1stvamp/ponto --standalone
+```
+
+Or natively:
+
+```shell
+$ ponto --standalone
 ```
 
 After all the assets are generated, unzip `ponto.zip` and open `ponto/index.html` in your favourite web browser.
@@ -74,6 +92,12 @@ Then, add it as environment variables to your Docker container with `--env-file`
 $ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" --env-file ./.env ghcr.io/1stvamp/ponto
 ```
 
+Running natively there's nothing extra to do: Ponto inherits your shell environment, so exported credentials are already available.
+
+```shell
+$ ponto
+```
+
 ### Define tfbackend, tfvars and Terraform variables
 
 Use `--tf-backend-config` to define backend config files and `--tf-vars-file` or `--tf-var` to define variables. For example, you can run the following in the `example/random-test` directory to overload variables.
@@ -82,12 +106,24 @@ Use `--tf-backend-config` to define backend config files and `--tf-vars-file` or
 $ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" ghcr.io/1stvamp/ponto --tf-backend-config test.tfbackend --tf-vars-file test.tfvars --tf-var max_length=4
 ```
 
+Or natively, from the `example/random-test` directory:
+
+```shell
+$ ponto --tf-backend-config test.tfbackend --tf-vars-file test.tfvars --tf-var max_length=4
+```
+
 ### Image generation
 
 Use `--gen-image` to generate and save the visualization as a SVG image.
 
 ```
 $ docker run --rm -it  -v "$(pwd):/src" ghcr.io/1stvamp/ponto --gen-image
+```
+
+Or natively (you need chromium or chrome on your machine):
+
+```shell
+$ ponto --gen-image
 ```
 
 Image generation needs chromium, which is only in the standard image. The `:slim` image cannot generate images (see below).
@@ -105,6 +141,12 @@ and needs no provider or backend credentials:
 $ terraform plan -out plan.tfplan
 $ terraform show -json plan.tfplan > plan.json
 $ docker run --rm -v "$(pwd):/src" ghcr.io/1stvamp/ponto --gen-image --plan-json-path plan.json
+```
+
+Or natively, with `ponto` on the runner:
+
+```shell
+$ ponto --gen-image --plan-json-path plan.json
 ```
 
 Ponto reads `plan.json`, writes `ponto.svg`, and exits. Attach the SVG to the
@@ -166,6 +208,26 @@ This produces `ghcr.io/1stvamp/ponto:latest`. There are two image variants:
 - `ghcr.io/1stvamp/ponto` (standard): Alpine based, includes chromium so `--gen-image` works.
 - `ghcr.io/1stvamp/ponto:slim`: a much smaller `scratch` image with ponto and terraform compressed by [UPX](https://github.com/upx/upx). It has no chromium, so `--gen-image` is not available. Build it with `docker buildx bake image-slim`.
 
+## Development
+
+Ponto uses [mise](https://mise.jdx.dev/) to pin its toolchain (Go, Node, Terraform) and to wrap the common build, test and run tasks, so a local checkout matches the build. Set the tools up with:
+
+```shell
+$ mise install
+```
+
+The tasks cover both the native and Docker workflows:
+
+- `mise run build`: build the `ponto` binary natively (builds the UI and embeds it).
+- `mise run build:ui`: build just the web UI into `ui/dist`.
+- `mise run build:docker` / `mise run build:docker-slim`: build the standard or slim Docker image.
+- `mise run test`: vet, format-check and compile the Go code.
+- `mise run fmt`: format the Go code.
+- `mise run ponto`: run Ponto natively, serving the web UI.
+- `mise run run:example`: serve the bundled `random-test` example.
+- `mise run run:docker`: run the standard Docker image against the current directory.
+
+Run `mise tasks` for the full list. If you would rather not use mise, the [Build from source](#build-from-source) steps above work on their own.
 
 ## Basic usage
 

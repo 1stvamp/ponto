@@ -1,0 +1,63 @@
+# mise configuration for Ponto.
+#
+#   mise install    set up the toolchain below
+#   mise tasks      list the build/test/run targets
+#   mise run build  build the binary natively (or `build:docker` for the image)
+
+[tools]
+go = "1.23"       # go.mod
+node = "20"       # Dockerfile NODE_VERSION; the Vue 2 UI build needs this toolchain
+terraform = "1.5.7" # for running Ponto natively against a Terraform config
+
+[tasks.install]
+description = "Install the UI dependencies"
+dir = "ui"
+run = "npm install"
+
+[tasks."build:ui"]
+description = "Build the embedded web UI into ui/dist"
+depends = ["install"]
+dir = "ui"
+# The Vue 2 / webpack 4 build needs the legacy OpenSSL provider on modern Node.
+env = { NODE_OPTIONS = "--openssl-legacy-provider" }
+run = "npm run build"
+
+[tasks.build]
+description = "Build the ponto binary natively (embeds the UI)"
+depends = ["build:ui"]
+run = "go build -o ponto ."
+
+[tasks."build:docker"]
+description = "Build the standard Docker image (ghcr.io/1stvamp/ponto)"
+run = "docker buildx bake image-local"
+
+[tasks."build:docker-slim"]
+description = "Build the slim scratch + UPX Docker image"
+run = "docker buildx bake image-slim"
+
+[tasks.fmt]
+description = "Format the Go code"
+run = "gofmt -w ."
+
+[tasks.test]
+description = "Vet, format-check and compile the Go code"
+run = [
+  "go vet ./...",
+  'test -z "$(gofmt -l .)" || { echo "gofmt needed on:"; gofmt -l .; exit 1; }',
+  "go build ./...",
+]
+
+[tasks."run:ponto"]
+alias = "ponto"
+description = "Run Ponto natively, serving the web UI"
+depends = ["build:ui"]
+run = "go run ."
+
+[tasks."run:example"]
+description = "Serve the bundled random-test example"
+depends = ["build:ui"]
+run = "go run . --working-dir example/random-test"
+
+[tasks."run:docker"]
+description = "Run the standard Docker image against the current directory"
+run = 'docker run --rm -it -p 9000:9000 -v "$PWD:/src" ghcr.io/1stvamp/ponto'
