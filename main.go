@@ -5,13 +5,13 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -20,6 +20,9 @@ import (
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/hashicorp/terraform-exec/tfexec"
 	tfjson "github.com/hashicorp/terraform-json"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 const VERSION = "0.3.3"
@@ -28,21 +31,6 @@ var TRUE = true
 
 //go:embed ui/dist
 var frontend embed.FS
-
-type arrayFlags []string
-
-func (i arrayFlags) String() string {
-	var ts []string
-	for _, el := range i {
-		ts = append(ts, el)
-	}
-	return strings.Join(ts, ",")
-}
-
-func (i *arrayFlags) Set(value string) error {
-	*i = append(*i, value)
-	return nil
-}
 
 type ponto struct {
 	Name             string
@@ -59,7 +47,8 @@ type ponto struct {
 	ShowSensitive    bool
 	GenImage         bool
 	ImageFormat      string
-	ImageFileName    string
+	Output           string
+	Verbose          bool
 	TFCNewRun        bool
 	Plan             *tfjson.Plan
 	RSO              *ResourcesOverview
@@ -68,123 +57,174 @@ type ponto struct {
 }
 
 func main() {
-	var tfPath, workingDir, name, zipFileName, ipPort, planPath, planJSONPath, workspaceName, tfcOrgName, tfcWorkspaceName, imageFormat, imageFileName string
-	var standalone, genImage, showSensitive, getVersion, tfcNewRun bool
-	var tfVarsFiles, tfVars, tfBackendConfigs arrayFlags
-	flag.StringVar(&tfPath, "tfPath", "/bin/terraform", "Path to Terraform binary")
-	flag.StringVar(&workingDir, "workingDir", ".", "Path to Terraform configuration")
-	flag.StringVar(&name, "name", "ponto", "Configuration name")
-	flag.StringVar(&zipFileName, "zipFileName", "ponto", "Standalone zip file name")
-	flag.StringVar(&ipPort, "ipPort", "0.0.0.0:9000", "IP and port for Ponto server")
-	flag.StringVar(&planPath, "planPath", "", "Plan file path")
-	flag.StringVar(&planJSONPath, "planJSONPath", "", "Plan JSON file path")
-	flag.StringVar(&workspaceName, "workspaceName", "", "Workspace name")
-	flag.StringVar(&tfcOrgName, "tfcOrg", "", "Terraform Cloud Organization name")
-	flag.StringVar(&tfcWorkspaceName, "tfcWorkspace", "", "Terraform Cloud Workspace name")
-	flag.BoolVar(&standalone, "standalone", false, "Generate standalone HTML files")
-	flag.BoolVar(&showSensitive, "showSensitive", false, "Display sensitive values")
-	flag.BoolVar(&tfcNewRun, "tfcNewRun", false, "Create new Terraform Cloud run")
-	flag.BoolVar(&getVersion, "version", false, "Get current version")
-	flag.BoolVar(&genImage, "genImage", false, "Generate graph image")
-	flag.StringVar(&imageFormat, "imageFormat", "svg", "Image format for -genImage: svg or png")
-	flag.StringVar(&imageFileName, "imageFileName", "ponto", "Output file name (without extension) for -genImage")
-	flag.Var(&tfVarsFiles, "tfVarsFile", "Path to *.tfvars files")
-	flag.Var(&tfVars, "tfVar", "Terraform variable (key=value)")
-	flag.Var(&tfBackendConfigs, "tfBackendConfig", "Path to *.tfbackend files")
-	flag.Parse()
+	if err := newRootCmd().Execute(); err != nil {
+		os.Exit(1)
+	}
+}
 
-	if getVersion {
-		fmt.Printf("Ponto v%s\n", VERSION)
-		return
+// resolveTfPath returns the terraform binary to use. An explicit --tf-path
+// wins; otherwise look up terraform then tofu on $PATH, falling back to the
+// container's /bin/terraform.
+func resolveTfPath(explicit string) string {
+	if explicit != "" {
+		return explicit
+	}
+	for _, bin := range []string{"terraform", "tofu"} {
+		if p, err := exec.LookPath(bin); err == nil {
+			return p
+		}
+	}
+	return "/bin/terraform"
+}
+
+func newRootCmd() *cobra.Command {
+	modeFlags := pflag.NewFlagSet("mode", pflag.ContinueOnError)
+	modeFlags.BoolP("standalone", "s", false, "Generate a standalone zip instead of serving")
+	modeFlags.BoolP("gen-image", "g", false, "Generate a graph image instead of serving")
+
+	inputFlags := pflag.NewFlagSet("input", pflag.ContinueOnError)
+	inputFlags.StringP("working-dir", "C", ".", "Path to the Terraform configuration")
+	inputFlags.StringP("plan-path", "p", "", "Path to a pre-generated binary plan file")
+	inputFlags.StringP("plan-json-path", "j", "", "Path to a pre-generated JSON plan file")
+	inputFlags.StringArrayP("tf-vars-file", "f", nil, "Path to a *.tfvars file (repeatable)")
+	inputFlags.StringArray("tf-var", nil, "Terraform variable, key=value (repeatable)")
+	inputFlags.StringArray("tf-backend-config", nil, "Path to a *.tfbackend file (repeatable)")
+	inputFlags.StringP("tf-path", "t", "", "Path to the terraform/tofu binary (default: terraform, then tofu, then /bin/terraform)")
+	inputFlags.StringP("workspace", "w", "", "Terraform workspace name")
+	inputFlags.String("tfc-org", "", "Terraform Cloud organization name")
+	inputFlags.String("tfc-workspace", "", "Terraform Cloud workspace name")
+	inputFlags.Bool("tfc-new-run", false, "Create a new Terraform Cloud run")
+
+	outputFlags := pflag.NewFlagSet("output", pflag.ContinueOnError)
+	outputFlags.StringP("address", "a", "0.0.0.0:9000", "Host:port for the Ponto server")
+	outputFlags.StringP("output", "o", "ponto", "Base name for generated files (.zip/.svg/.png)")
+	outputFlags.String("image-format", "svg", "Image format for --gen-image: svg or png")
+	outputFlags.String("name", "ponto", "Configuration name")
+	outputFlags.Bool("show-sensitive", false, "Display sensitive values")
+
+	metaFlags := pflag.NewFlagSet("meta", pflag.ContinueOnError)
+	metaFlags.BoolP("verbose", "v", false, "Verbose logging (stream terraform output)")
+
+	v := viper.New()
+
+	cmd := &cobra.Command{
+		Use:   "ponto",
+		Short: "Ponto is an interactive Terraform plan and state visualizer",
+		Long: "Ponto renders a Terraform plan or state as an interactive graph.\n" +
+			"By default it serves a web UI; it can also emit a standalone bundle or a static image.",
+		Version:       VERSION,
+		SilenceUsage:  true,
+		SilenceErrors: false,
+		Args:          cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd, v)
+		},
+	}
+	cmd.SetVersionTemplate("Ponto v{{.Version}}\n")
+
+	cmd.Flags().AddFlagSet(modeFlags)
+	cmd.Flags().AddFlagSet(inputFlags)
+	cmd.Flags().AddFlagSet(outputFlags)
+	cmd.Flags().AddFlagSet(metaFlags)
+	cmd.MarkFlagsMutuallyExclusive("standalone", "gen-image")
+
+	v.SetEnvPrefix("PONTO")
+	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	v.AutomaticEnv()
+	v.BindPFlags(cmd.Flags())
+
+	cmd.SetUsageFunc(func(c *cobra.Command) error {
+		out := c.OutOrStderr()
+		fmt.Fprintf(out, "Usage:\n  %s [flags]\n\n", c.CommandPath())
+		fmt.Fprintf(out, "Modes (default: serve the web UI):\n%s\n", modeFlags.FlagUsages())
+		fmt.Fprintf(out, "Input:\n%s\n", inputFlags.FlagUsages())
+		fmt.Fprintf(out, "Output and server:\n%s\n", outputFlags.FlagUsages())
+		fmt.Fprintf(out, "Other:\n%s", metaFlags.FlagUsages())
+		fmt.Fprintf(out, "  -h, --help      Show this help\n")
+		fmt.Fprintf(out, "      --version   Print the version\n")
+		return nil
+	})
+
+	return cmd
+}
+
+func run(cmd *cobra.Command, v *viper.Viper) error {
+	genImage := v.GetBool("gen-image")
+	imageFormat := v.GetString("image-format")
+	if genImage && imageFormat != "svg" && imageFormat != "png" {
+		return fmt.Errorf("invalid --image-format %q: must be \"svg\" or \"png\"", imageFormat)
 	}
 
 	log.Println("Starting Ponto...")
 
-	if genImage && imageFormat != "svg" && imageFormat != "png" {
-		log.Fatalf("Invalid -imageFormat %q: must be \"svg\" or \"png\"", imageFormat)
-	}
-
-	parsedTfVarsFiles := strings.Split(tfVarsFiles.String(), ",")
-	parsedTfVars := strings.Split(tfVars.String(), ",")
-	parsedTfBackendConfigs := strings.Split(tfBackendConfigs.String(), ",")
+	// Repeatable flags come from pflag directly; env binding is for scalars.
+	tfVarsFiles, _ := cmd.Flags().GetStringArray("tf-vars-file")
+	tfVars, _ := cmd.Flags().GetStringArray("tf-var")
+	tfBackendConfigs, _ := cmd.Flags().GetStringArray("tf-backend-config")
 
 	path, err := os.Getwd()
 	if err != nil {
-		log.Fatal(errors.New("Unable to get current working directory"))
+		return errors.New("unable to get current working directory")
 	}
 
-	if planPath != "" {
-		if !strings.HasPrefix(planPath, "/") {
-			planPath = filepath.Join(path, planPath)
-		}
+	planPath := v.GetString("plan-path")
+	if planPath != "" && !strings.HasPrefix(planPath, "/") {
+		planPath = filepath.Join(path, planPath)
 	}
-
-	if planJSONPath != "" {
-		if !strings.HasPrefix(planJSONPath, "/") {
-			planJSONPath = filepath.Join(path, planJSONPath)
-		}
+	planJSONPath := v.GetString("plan-json-path")
+	if planJSONPath != "" && !strings.HasPrefix(planJSONPath, "/") {
+		planJSONPath = filepath.Join(path, planJSONPath)
 	}
 
 	r := ponto{
-		Name:             name,
-		WorkingDir:       workingDir,
-		TfPath:           tfPath,
+		Name:             v.GetString("name"),
+		WorkingDir:       v.GetString("working-dir"),
+		TfPath:           resolveTfPath(v.GetString("tf-path")),
 		PlanPath:         planPath,
 		PlanJSONPath:     planJSONPath,
-		ShowSensitive:    showSensitive,
+		ShowSensitive:    v.GetBool("show-sensitive"),
 		GenImage:         genImage,
 		ImageFormat:      imageFormat,
-		ImageFileName:    imageFileName,
-		TfVarsFiles:      parsedTfVarsFiles,
-		TfVars:           parsedTfVars,
-		TfBackendConfigs: parsedTfBackendConfigs,
-		WorkspaceName:    workspaceName,
-		TFCOrgName:       tfcOrgName,
-		TFCWorkspaceName: tfcWorkspaceName,
-		TFCNewRun:        tfcNewRun,
+		Output:           v.GetString("output"),
+		Verbose:          v.GetBool("verbose"),
+		TfVarsFiles:      tfVarsFiles,
+		TfVars:           tfVars,
+		TfBackendConfigs: tfBackendConfigs,
+		WorkspaceName:    v.GetString("workspace"),
+		TFCOrgName:       v.GetString("tfc-org"),
+		TFCWorkspaceName: v.GetString("tfc-workspace"),
+		TFCNewRun:        v.GetBool("tfc-new-run"),
 	}
 
-	// Generate assets
-	err = r.generateAssets()
-	if err != nil {
-		log.Fatal(err.Error())
+	if err := r.generateAssets(); err != nil {
+		return err
 	}
-
 	log.Println("Done generating assets.")
 
-	// Save to file (debug)
-	// saveJSONToFile(name, "plan", "output", r.Plan)
-	// saveJSONToFile(name, "rso", "output", r.Plan)
-	// saveJSONToFile(name, "map", "output", r.Map)
-	// saveJSONToFile(name, "graph", "output", r.Graph)
-
-	// Embed frontend
 	fe, err := fs.Sub(frontend, "ui/dist")
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	frontendFS := http.FileServer(http.FS(fe))
 
-	if standalone {
-		err = r.generateZip(fe, fmt.Sprintf("%s.zip", zipFileName))
-		if err != nil {
-			log.Fatalln(err)
+	if v.GetBool("standalone") {
+		zipName := fmt.Sprintf("%s.zip", r.Output)
+		if err := r.generateZip(fe, zipName); err != nil {
+			return err
 		}
-
-		log.Printf("Generated zip file: %s.zip\n", zipFileName)
-		return
+		log.Printf("Generated zip file: %s\n", zipName)
+		return nil
 	}
 
-	err = r.startServer(ipPort, frontendFS)
-	if err != nil {
-		// http.Serve() returns error on shutdown
+	if err := r.startServer(v.GetString("address"), frontendFS); err != nil {
+		// http.Serve() returns an error on shutdown; for gen-image that's expected.
 		if genImage {
 			log.Println("Server shut down.")
-		} else {
-			log.Fatalf("Could not start server: %s\n", err.Error())
+			return nil
 		}
+		return fmt.Errorf("could not start server: %w", err)
 	}
-
+	return nil
 }
 
 func (r *ponto) generateAssets() error {
@@ -223,6 +263,13 @@ func (r *ponto) getPlan() error {
 	tf, err := tfexec.NewTerraform(r.WorkingDir, r.TfPath)
 	if err != nil {
 		return err
+	}
+
+	// With --verbose, stream terraform's own init/plan output so a long init
+	// doesn't look like a freeze.
+	if r.Verbose {
+		tf.SetStdout(os.Stderr)
+		tf.SetStderr(os.Stderr)
 	}
 
 	// If user provided path to plan file

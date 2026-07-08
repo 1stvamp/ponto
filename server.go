@@ -70,7 +70,7 @@ func (ro *ponto) startServer(ipPort string, frontendFS http.Handler) error {
 
 	// The browser can connect now because the listening socket is open.
 	if ro.GenImage {
-		go screenshot(&s, ro.ImageFormat, ro.ImageFileName)
+		go screenshot(&s, ro.ImageFormat, ro.Output)
 	}
 
 	// Start the blocking server loop.
