@@ -96,7 +96,7 @@ func newRootCmd() *cobra.Command {
 	inputFlags.Bool("tfc-new-run", false, "Create a new Terraform Cloud run")
 
 	outputFlags := pflag.NewFlagSet("output", pflag.ContinueOnError)
-	outputFlags.StringP("address", "a", "0.0.0.0:9000", "Host:port for the Ponto server")
+	outputFlags.StringP("address", "a", "0.0.0.0:7668", "Host:port for the Ponto server")
 	outputFlags.StringP("output", "o", "ponto", "Base name for generated files (.zip/.svg/.png)")
 	outputFlags.String("image-format", "svg", "Image format for --gen-image: svg or png")
 	outputFlags.String("name", "ponto", "Configuration name")
