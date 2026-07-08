@@ -92,6 +92,22 @@ $ docker run --rm -it  -v "$(pwd):/src" ghcr.io/1stvamp/ponto -genImage true
 
 Image generation needs chromium, which is only in the standard image. The `:slim` image cannot generate images (see below).
 
+#### From a pre-generated plan (CI / pipelines)
+
+In a pipeline you usually already have a plan and the credentials sit with the
+job that produced it, not with Ponto. Generate the plan JSON in that job, then
+hand it to Ponto with `-planJSONPath` so Ponto never runs `terraform init`/`plan`
+and needs no provider or backend credentials:
+
+```
+$ terraform plan -out plan.tfplan
+$ terraform show -json plan.tfplan > plan.json
+$ docker run --rm -v "$(pwd):/src" ghcr.io/1stvamp/ponto -genImage -planJSONPath plan.json
+```
+
+Ponto reads `plan.json`, writes `ponto.svg`, and exits. Attach the SVG to the
+job output. The plan JSON must be Unix (LF), UTF-8.
+
 ## Installation
 
 You can download the Ponto binary specific to your system from the [Releases page](https://github.com/1stvamp/ponto/releases). Download the binary, unzip, then move `ponto` into your `PATH`.
