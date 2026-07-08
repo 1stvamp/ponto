@@ -10,6 +10,8 @@ In order to do this, Ponto:
 1. parses the `plan` and configuration files to generate three items: the resource overview (`rso`), the resource map (`map`), and the resource graph (`graph`).
 1. consumes the `rso`, `map`, and `graph` to generate an interactive configuration and state visualization hosts on `0.0.0.0:9000`.
 
+![Ponto Screenshot](docs/ponto-screenshot.png)
+
 ## Quickstart
 
 The fastest way to get up and running with Ponto is through Docker.
