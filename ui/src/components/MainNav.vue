@@ -10,6 +10,15 @@
         >Save Graph</a
       >
       <a id="savePng" class="button outline" @click="savePng()">Save PNG</a>
+      <label class="unchanged-toggle">
+        <input
+          id="showUnchanged"
+          type="checkbox"
+          v-model="showUnchanged"
+          @change="emitUnchanged"
+        />
+        Show unchanged
+      </label>
       <!-- <a class="button outline" @click="toggleGraph()">{{
         graph ? "Hide Graph" : "Show Graph"
       }}</a> -->
@@ -27,6 +36,7 @@ export default {
     return {
       colorMode: "☀️",
       graph: true,
+      showUnchanged: false,
     };
   },
   methods: {
@@ -48,6 +58,9 @@ export default {
     },
     savePng() {
       this.$emit("savePng", true);
+    },
+    emitUnchanged() {
+      this.$emit("toggleUnchanged", this.showUnchanged);
     },
   },
   mounted() {
