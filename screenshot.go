@@ -15,7 +15,7 @@ import (
 )
 
 // Heavily inspired by: https://github.com/chromedp/examples/blob/master/download_file/main.go
-func screenshot(s *http.Server) {
+func screenshot(s *http.Server, format string, fileName string) {
 	// ctx, cancel := chromedp.NewContext(context.Background(), chromedp.WithDebugf(log.Printf))
 	ctx, cancel := chromedp.NewContext(context.Background())
 	defer cancel()
@@ -25,6 +25,14 @@ func screenshot(s *http.Server) {
 	defer cancel()
 
 	url := fmt.Sprintf("http://%s", s.Addr)
+
+	// Which export button to drive, and the resulting file extension.
+	clickSelector := "#saveGraph"
+	ext := "svg"
+	if format == "png" {
+		clickSelector = "#savePng"
+		ext = "png"
+	}
 
 	// this will be used to capture the file name later
 	var downloadGUID string
@@ -47,21 +55,28 @@ func screenshot(s *http.Server) {
 		chromedp.Navigate(url),
 		// wait for graph to be visible
 		chromedp.WaitVisible(`#cytoscape-div`),
-		// find and click "Save Graph" button
-		chromedp.Click(`#saveGraph`, chromedp.NodeVisible),
+		// find and click the export button ("Save Graph" for SVG, "Save PNG" for PNG)
+		chromedp.Click(clickSelector, chromedp.NodeVisible),
 	}); err != nil && !strings.Contains(err.Error(), "net::ERR_ABORTED") {
 		// Note: Ignoring the net::ERR_ABORTED page error is essential here since downloads
 		// will cause this error to be emitted, although the download will still succeed.
 		log.Fatal(err)
 	}
-	<-downloadComplete
+	// Don't block forever: if the download never fires (e.g. the export failed)
+	// the context timeout needs to be able to kill us rather than hang.
+	select {
+	case <-downloadComplete:
+	case <-ctx.Done():
+		log.Fatalf("Timed out waiting for the %s export to download", ext)
+	}
 
-	e := moveFile(fmt.Sprintf("%v/%v", os.TempDir(), downloadGUID), "./ponto.svg")
+	dest := fmt.Sprintf("./%s.%s", fileName, ext)
+	e := moveFile(fmt.Sprintf("%v/%v", os.TempDir(), downloadGUID), dest)
 	if e != nil {
 		log.Fatal(e)
 	}
 
-	log.Println("Image generation complete.")
+	log.Printf("Image generation complete: %s", dest)
 
 	// Shutdown http server
 	s.Shutdown(context.Background())

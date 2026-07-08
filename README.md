@@ -92,6 +92,8 @@ $ docker run --rm -it  -v "$(pwd):/src" ghcr.io/1stvamp/ponto -genImage true
 
 Image generation needs chromium, which is only in the standard image. The `:slim` image cannot generate images (see below).
 
+SVG is the default. For a raster image use `-imageFormat png`, and set the output name (without extension) with `-imageFileName` (defaults to `ponto`). The same buttons ("Save Graph" for SVG, "Save PNG" for PNG) are in the UI too.
+
 #### From a pre-generated plan (CI / pipelines)
 
 In a pipeline you usually already have a plan and the credentials sit with the
@@ -106,7 +108,8 @@ $ docker run --rm -v "$(pwd):/src" ghcr.io/1stvamp/ponto -genImage -planJSONPath
 ```
 
 Ponto reads `plan.json`, writes `ponto.svg`, and exits. Attach the SVG to the
-job output. The plan JSON must be Unix (LF), UTF-8.
+job output (add `-imageFormat png` if you'd rather attach a PNG). The plan JSON
+must be Unix (LF), UTF-8.
 
 ## Installation
 

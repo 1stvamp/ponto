@@ -58,6 +58,8 @@ type ponto struct {
 	TFCWorkspaceName string
 	ShowSensitive    bool
 	GenImage         bool
+	ImageFormat      string
+	ImageFileName    string
 	TFCNewRun        bool
 	Plan             *tfjson.Plan
 	RSO              *ResourcesOverview
@@ -66,7 +68,7 @@ type ponto struct {
 }
 
 func main() {
-	var tfPath, workingDir, name, zipFileName, ipPort, planPath, planJSONPath, workspaceName, tfcOrgName, tfcWorkspaceName string
+	var tfPath, workingDir, name, zipFileName, ipPort, planPath, planJSONPath, workspaceName, tfcOrgName, tfcWorkspaceName, imageFormat, imageFileName string
 	var standalone, genImage, showSensitive, getVersion, tfcNewRun bool
 	var tfVarsFiles, tfVars, tfBackendConfigs arrayFlags
 	flag.StringVar(&tfPath, "tfPath", "/bin/terraform", "Path to Terraform binary")
@@ -84,6 +86,8 @@ func main() {
 	flag.BoolVar(&tfcNewRun, "tfcNewRun", false, "Create new Terraform Cloud run")
 	flag.BoolVar(&getVersion, "version", false, "Get current version")
 	flag.BoolVar(&genImage, "genImage", false, "Generate graph image")
+	flag.StringVar(&imageFormat, "imageFormat", "svg", "Image format for -genImage: svg or png")
+	flag.StringVar(&imageFileName, "imageFileName", "ponto", "Output file name (without extension) for -genImage")
 	flag.Var(&tfVarsFiles, "tfVarsFile", "Path to *.tfvars files")
 	flag.Var(&tfVars, "tfVar", "Terraform variable (key=value)")
 	flag.Var(&tfBackendConfigs, "tfBackendConfig", "Path to *.tfbackend files")
@@ -95,6 +99,10 @@ func main() {
 	}
 
 	log.Println("Starting Ponto...")
+
+	if genImage && imageFormat != "svg" && imageFormat != "png" {
+		log.Fatalf("Invalid -imageFormat %q: must be \"svg\" or \"png\"", imageFormat)
+	}
 
 	parsedTfVarsFiles := strings.Split(tfVarsFiles.String(), ",")
 	parsedTfVars := strings.Split(tfVars.String(), ",")
@@ -125,6 +133,8 @@ func main() {
 		PlanJSONPath:     planJSONPath,
 		ShowSensitive:    showSensitive,
 		GenImage:         genImage,
+		ImageFormat:      imageFormat,
+		ImageFileName:    imageFileName,
 		TfVarsFiles:      parsedTfVarsFiles,
 		TfVars:           parsedTfVars,
 		TfBackendConfigs: parsedTfBackendConfigs,

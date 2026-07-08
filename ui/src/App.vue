@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <main-nav @saveGraph="saveGraph" />
+    <main-nav @saveGraph="saveGraph" @savePng="savePng" />
     <div class="row">
       <div class="col col-4-lg">
         <fieldset>
@@ -76,6 +76,9 @@ export default {
     saveGraph() {
       // this.displayGraph = displayGraph;
       this.$refs.filegraph.saveGraph();
+    },
+    savePng() {
+      this.$refs.filegraph.savePng();
     },
     selectResource(resourceID) {
       this.resourceID = resourceID;

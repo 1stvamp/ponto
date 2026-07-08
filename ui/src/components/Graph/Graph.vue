@@ -485,7 +485,13 @@ export default {
       var svgContent = cy.svg({scale: 1, full: true});
 			var blob = new Blob([svgContent], {type:"image/svg+xml;charset=utf-8"});
 			saveAs(blob, "ponto.svg");
-			
+
+    },
+    savePng: function () {
+      let cy = this.$refs.cy.instance;
+      // full: the whole graph, not just the viewport; bg so it isn't transparent
+      var blob = cy.png({output: "blob", full: true, scale: 1, bg: "#ffffff"});
+      saveAs(blob, "ponto.png");
     },
     runLayouts: function () {
       let cy = this.$refs.cy.instance;
