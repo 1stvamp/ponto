@@ -9,6 +9,7 @@
       <a id="saveGraph" class="button outline" @click="saveGraph()"
         >Save Graph</a
       >
+      <a id="savePng" class="button outline" @click="savePng()">Save PNG</a>
       <!-- <a class="button outline" @click="toggleGraph()">{{
         graph ? "Hide Graph" : "Show Graph"
       }}</a> -->
@@ -44,6 +45,9 @@ export default {
     // },
     saveGraph() {
       this.$emit("saveGraph", true);
+    },
+    savePng() {
+      this.$emit("savePng", true);
     },
   },
   mounted() {
