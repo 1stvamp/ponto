@@ -2,6 +2,14 @@
   <transition name="graph">
     <fieldset>
       <legend>Graph</legend>
+      <p v-if="noChangeNote" class="graph-note">
+        No resource changes in this plan, so the full graph is shown.
+      </p>
+      <p v-if="guardActive" class="graph-note">
+        Showing all {{ graph.nodes.length }} resources. Large graphs can be slow
+        to render in the browser; for big plans the static image
+        (<code>-genImage</code>) is faster.
+      </p>
       <cytoscape ref="cy" :config="config" :preConfig="preConfig"></cytoscape>
     </fieldset>
   </transition>
@@ -297,14 +305,85 @@ const config = {
 
 export default {
   name: "Graph",
+  props: {
+    // When false (default) the graph shows only changed resources plus the
+    // resources connected to them (see #6). When true it shows everything.
+    showUnchanged: { type: Boolean, default: false },
+  },
   data() {
     return {
       selectedNode: "",
       config,
       graph: {},
+      guardActive: false,
+      noChangeNote: false,
     };
   },
+  watch: {
+    showUnchanged() {
+      if (this.graph && this.graph.nodes) {
+        this.renderGraph();
+      }
+    },
+  },
   methods: {
+    isChanged: function (n) {
+      return ["create", "update", "delete", "replace"].includes(n.data.change);
+    },
+    // The set of node ids to render in changes-only mode: the changed resources,
+    // everything transitively downstream of them (the blast radius that a change
+    // could affect), their direct (1-hop) upstream dependencies, and the ancestor
+    // containers of all of those so the nesting still renders.
+    changedSubset: function (changed, edges) {
+      const byId = {};
+      this.graph.nodes.forEach((n) => {
+        byId[n.data.id] = n;
+      });
+
+      // source depends on target, so dependents of X are the sources of edges
+      // whose target is X, and dependencies of X are the targets of edges whose
+      // source is X.
+      const dependents = {};
+      const dependencies = {};
+      edges.forEach((e) => {
+        (dependents[e.data.target] = dependents[e.data.target] || []).push(
+          e.data.source
+        );
+        (dependencies[e.data.source] = dependencies[e.data.source] || []).push(
+          e.data.target
+        );
+      });
+
+      const keep = new Set(changed.map((n) => n.data.id));
+
+      // Transitive downstream dependents (blast radius).
+      const queue = [...keep];
+      while (queue.length) {
+        const id = queue.pop();
+        (dependents[id] || []).forEach((s) => {
+          if (!keep.has(s)) {
+            keep.add(s);
+            queue.push(s);
+          }
+        });
+      }
+
+      // 1-hop upstream dependencies of the changed resources only.
+      changed.forEach((n) => {
+        (dependencies[n.data.id] || []).forEach((t) => keep.add(t));
+      });
+
+      // Ancestor containers (type/file/module) of everything kept.
+      [...keep].forEach((id) => {
+        let p = byId[id] && byId[id].data.parent;
+        while (p) {
+          keep.add(p);
+          p = byId[p] && byId[p].data.parent;
+        }
+      });
+
+      return keep;
+    },
     preConfig(cy) {
       cy.use(klay);
       cy.use(svg);
@@ -349,10 +428,31 @@ export default {
         edges.push(n);
       });
 
+      // Decide what to render. By default show only changed resources and the
+      // resources connected to them; the toggle brings back the full graph. A
+      // plan with no changes falls back to the full graph (nothing to filter to).
+      const changed = this.graph.nodes.filter((n) => this.isChanged(n));
+      this.noChangeNote = false;
+      this.guardActive = false;
+
+      let nodes, renderEdges;
+      if (this.showUnchanged || changed.length === 0) {
+        nodes = this.graph.nodes;
+        renderEdges = edges;
+        this.noChangeNote = changed.length === 0;
+        this.guardActive = this.showUnchanged && this.graph.nodes.length > 500;
+      } else {
+        const keep = this.changedSubset(changed, edges);
+        nodes = this.graph.nodes.filter((n) => keep.has(n.data.id));
+        renderEdges = edges.filter(
+          (e) => keep.has(e.data.source) && keep.has(e.data.target)
+        );
+      }
+
       cy.batch(() => {
         cy.remove(el);
-        cy.add(this.graph.nodes);
-        cy.add(edges);
+        cy.add(nodes);
+        cy.add(renderEdges);
       });
 
       // cy.nodeHtmlLabel([
@@ -525,6 +625,15 @@ export default {
 </script>
 
 <style>
+.graph-note {
+  margin: 0 0 0.5em;
+  padding: 0.4em 0.6em;
+  font-size: 0.85em;
+  background-color: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 0.25em;
+}
+
 #cytoscape-div {
   height: 1000px !important;
   background-color: #f8f8f8 !important;

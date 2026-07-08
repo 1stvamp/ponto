@@ -1,6 +1,10 @@
 <template>
   <div id="app">
-    <main-nav @saveGraph="saveGraph" @savePng="savePng" />
+    <main-nav
+      @saveGraph="saveGraph"
+      @savePng="savePng"
+      @toggleUnchanged="onToggleUnchanged"
+    />
     <div class="row">
       <div class="col col-4-lg">
         <fieldset>
@@ -40,6 +44,7 @@
         <graph
           ref="filegraph"
           :displayGraph="displayGraph"
+          :showUnchanged="showUnchanged"
           v-on:getNode="selectResource"
         />
         <explorer @selectResource="selectResource" />
@@ -70,9 +75,13 @@ export default {
     return {
       displayGraph: true,
       resourceID: "",
+      showUnchanged: false,
     };
   },
   methods: {
+    onToggleUnchanged(value) {
+      this.showUnchanged = value;
+    },
     saveGraph() {
       // this.displayGraph = displayGraph;
       this.$refs.filegraph.saveGraph();
