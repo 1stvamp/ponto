@@ -323,15 +323,10 @@ export default {
       let el = cy.elements();
       const nodesNames = this.graph.nodes.map((x) => x.data.id);
 
-      // Reset graph
-      cy.remove(el);
-
-      // Add nodes
-      this.graph.nodes.forEach((n) => {
-        cy.add(n);
-      });
-
-      // Add edges
+      // Resolve edge targets first, then add everything in one batch. Adding
+      // elements one at a time makes cytoscape recalc style per call, which goes
+      // quadratic on big plans and hangs the browser (see #6).
+      const edges = [];
       this.graph.edges.forEach((n) => {
         if (n.data.id.includes("-variable") || n.data.id.includes("-output")) {
           return;
@@ -351,9 +346,13 @@ export default {
           name = name.join(".");
         }
         n.data.target = name;
+        edges.push(n);
+      });
 
-        // Add edge to the final graph
-        cy.add(n);
+      cy.batch(() => {
+        cy.remove(el);
+        cy.add(this.graph.nodes);
+        cy.add(edges);
       });
 
       // cy.nodeHtmlLabel([
