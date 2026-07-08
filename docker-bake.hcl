@@ -1,5 +1,5 @@
 variable "GO_VERSION" {
-  default = "1.23"
+  default = "1.24"
 }
 variable "NODE_VERSION" {
   default = "20"
