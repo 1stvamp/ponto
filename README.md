@@ -35,7 +35,7 @@ Once Ponto runs on `0.0.0.0:9000`, navigate to it to find the visualization!
 
 ### Run on Terraform plan file
 
-Use `-planJSONPath` to start Ponto on Terraform plan file. The `plan.json` file should be in Linux version - Unix (LF), UTF-8.
+Use `--plan-json-path` to start Ponto on Terraform plan file. The `plan.json` file should be in Linux version - Unix (LF), UTF-8.
 
 First, generate the plan file in JSON format.
 
@@ -47,7 +47,7 @@ $ terraform show -json plan.out > plan.json
 Then, run Ponto on it.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v $(pwd)/plan.json:/src/plan.json ghcr.io/1stvamp/ponto:latest -planJSONPath=plan.json
+$ docker run --rm -it -p 9000:9000 -v $(pwd)/plan.json:/src/plan.json ghcr.io/1stvamp/ponto:latest --plan-json-path=plan.json
 ```
 
 ### Standalone mode
@@ -55,7 +55,7 @@ $ docker run --rm -it -p 9000:9000 -v $(pwd)/plan.json:/src/plan.json ghcr.io/1s
 Standalone mode generates a `ponto.zip` file containing all the static assets.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" ghcr.io/1stvamp/ponto -standalone true
+$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" ghcr.io/1stvamp/ponto --standalone
 ```
 
 After all the assets are generated, unzip `ponto.zip` and open `ponto/index.html` in your favourite web browser.
@@ -76,39 +76,39 @@ $ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" --env-file ./.env ghcr.io/1s
 
 ### Define tfbackend, tfvars and Terraform variables
 
-Use `-tfBackendConfig` to define backend config files and `-tfVarsFile` or `-tfVar` to define variables. For example, you can run the following in the `example/random-test` directory to overload variables.
+Use `--tf-backend-config` to define backend config files and `--tf-vars-file` or `--tf-var` to define variables. For example, you can run the following in the `example/random-test` directory to overload variables.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" ghcr.io/1stvamp/ponto -tfBackendConfig test.tfbackend -tfVarsFile test.tfvars -tfVar max_length=4
+$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" ghcr.io/1stvamp/ponto --tf-backend-config test.tfbackend --tf-vars-file test.tfvars --tf-var max_length=4
 ```
 
 ### Image generation
 
-Use `-genImage` to generate and save the visualization as a SVG image.
+Use `--gen-image` to generate and save the visualization as a SVG image.
 
 ```
-$ docker run --rm -it  -v "$(pwd):/src" ghcr.io/1stvamp/ponto -genImage true
+$ docker run --rm -it  -v "$(pwd):/src" ghcr.io/1stvamp/ponto --gen-image
 ```
 
 Image generation needs chromium, which is only in the standard image. The `:slim` image cannot generate images (see below).
 
-SVG is the default. For a raster image use `-imageFormat png`, and set the output name (without extension) with `-imageFileName` (defaults to `ponto`). The same buttons ("Save Graph" for SVG, "Save PNG" for PNG) are in the UI too.
+SVG is the default. For a raster image use `--image-format png`, and set the output name (without extension) with `-o/--output` (defaults to `ponto`). The same buttons ("Save Graph" for SVG, "Save PNG" for PNG) are in the UI too.
 
 #### From a pre-generated plan (CI / pipelines)
 
 In a pipeline you usually already have a plan and the credentials sit with the
 job that produced it, not with Ponto. Generate the plan JSON in that job, then
-hand it to Ponto with `-planJSONPath` so Ponto never runs `terraform init`/`plan`
+hand it to Ponto with `--plan-json-path` so Ponto never runs `terraform init`/`plan`
 and needs no provider or backend credentials:
 
 ```
 $ terraform plan -out plan.tfplan
 $ terraform show -json plan.tfplan > plan.json
-$ docker run --rm -v "$(pwd):/src" ghcr.io/1stvamp/ponto -genImage -planJSONPath plan.json
+$ docker run --rm -v "$(pwd):/src" ghcr.io/1stvamp/ponto --gen-image --plan-json-path plan.json
 ```
 
 Ponto reads `plan.json`, writes `ponto.svg`, and exits. Attach the SVG to the
-job output (add `-imageFormat png` if you'd rather attach a PNG). The plan JSON
+job output (add `--image-format png` if you'd rather attach a PNG). The plan JSON
 must be Unix (LF), UTF-8.
 
 ## Installation
@@ -163,8 +163,8 @@ $ docker buildx bake image-local
 
 This produces `ghcr.io/1stvamp/ponto:latest`. There are two image variants:
 
-- `ghcr.io/1stvamp/ponto` (standard): Alpine based, includes chromium so `-genImage` works.
-- `ghcr.io/1stvamp/ponto:slim`: a much smaller `scratch` image with ponto and terraform compressed by [UPX](https://github.com/upx/upx). It has no chromium, so `-genImage` is not available. Build it with `docker buildx bake image-slim`.
+- `ghcr.io/1stvamp/ponto` (standard): Alpine based, includes chromium so `--gen-image` works.
+- `ghcr.io/1stvamp/ponto:slim`: a much smaller `scratch` image with ponto and terraform compressed by [UPX](https://github.com/upx/upx). It has no chromium, so `--gen-image` is not available. Build it with `docker buildx bake image-slim`.
 
 
 ## Basic usage
@@ -177,7 +177,7 @@ Navigate into `random-test` example configuration. This directory contains confi
 $ cd example/random-test
 ```
 
-Run Ponto. Ponto will start running in the current directory and assume the Terraform binary lives in `/bin/terraform` by default. Use `-tfPath` to point at a different location.
+Run Ponto. Ponto will start running in the current directory and assume the Terraform binary lives in `/bin/terraform` by default. Use `--tf-path` to point at a different location.
 
 ```
 $ ponto
@@ -195,7 +195,7 @@ $ ponto
 You can specify the working directory (where your configuration is living) and the Terraform binary location using flags.
 
 ```
-$ ponto -workingDir "example/eks-cluster" -tfPath "/Users/dos/terraform"
+$ ponto --working-dir "example/eks-cluster" --tf-path "/Users/dos/terraform"
 ```
 
 Once Ponto runs on `0.0.0.0:9000`, navigate to it to find the visualization!
