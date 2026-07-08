@@ -482,7 +482,7 @@ export default {
     },
     saveGraph: function () {
       let cy = this.$refs.cy.instance;
-      var svgContent = cy.svg({scale: 0.1, full: true});
+      var svgContent = cy.svg({scale: 1, full: true});
 			var blob = new Blob([svgContent], {type:"image/svg+xml;charset=utf-8"});
 			saveAs(blob, "ponto.svg");
 			
