@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"sort"
 	"strings"
@@ -548,9 +550,18 @@ func renderCardPNG(html, outPath string) error {
 // runSummary classifies the plan and renders it in the requested format.
 // It returns the process exit code: 2 when the plan is destructive (Danger),
 // so it can be dropped into CI as a gate.
-func runSummary(r *ponto, format, emoji, output string) (int, error) {
+func runSummary(r *ponto, format, emoji, output string, interactive bool) (int, error) {
 	if _, ok := emojiSets[emoji]; !ok {
 		return 1, fmt.Errorf("invalid --emoji %q: must be dots, signs or none", emoji)
+	}
+	// --format tui is an alias for the interactive terminal view.
+	if format == "tui" {
+		format = "terminal"
+		interactive = true
+	}
+	if interactive {
+		// The alt-screen TUI can't share the screen with plan logs.
+		log.SetOutput(io.Discard)
 	}
 	if err := r.getPlan(); err != nil {
 		return 1, fmt.Errorf("unable to load plan: %w", err)
@@ -559,6 +570,12 @@ func runSummary(r *ponto, format, emoji, output string) (int, error) {
 
 	switch format {
 	case "terminal":
+		if interactive {
+			if err := runSummaryTUI(m, emoji); err != nil {
+				return 1, err
+			}
+			break
+		}
 		fmt.Print(renderSummaryTerminal(m, emoji))
 	case "markdown":
 		fmt.Print(renderSummaryMarkdown(m, emoji))

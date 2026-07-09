@@ -106,6 +106,10 @@ description = "Print the safety-graded plan summary for the bundled random-test 
 # No build:ui dep: the summary is terminal-only and never touches the web UI.
 run = "go run . summary --working-dir example/random-test"
 
+[tasks."run:summary-tui-example"]
+description = "Explore the safety-graded plan summary for the bundled random-test example interactively"
+run = "go run . summary --format tui --working-dir example/random-test"
+
 [tasks."run:docker"]
 description = "Run the standard Docker image against the current directory"
 run = 'docker run --rm -it -p 7668:7668 -v "$PWD:/src" ghcr.io/1stvamp/ponto'
