@@ -1,0 +1,73 @@
+# Plan safety summary — example CI workflow.
+#
+# This runs manually (workflow_dispatch) against the bundled example so you can
+# see it work. To use it as a real destructive-change gate in your own
+# Terraform repo, copy this file there and:
+#   1. change the trigger to `on: pull_request`
+#   2. point the terraform steps at your config (and wire in your backend/creds)
+#   3. keep the `ponto summary` gate step — it exits 2 on a Danger plan, failing
+#      the job so a destructive plan cannot merge without review.
+#
+# The "comment on the PR" step uses the markdown renderer; it only runs in a
+# pull_request context.
+name: plan-summary
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  plan-summary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+
+      - name: Build ponto
+        run: go build -o ponto .
+
+      - name: Generate a plan JSON
+        working-directory: example/random-test
+        run: |
+          terraform init -input=false
+          terraform plan -input=false -out plan.bin
+          terraform show -json plan.bin > plan.json
+
+      - name: Render markdown summary
+        run: |
+          ./ponto summary \
+            --plan-json-path example/random-test/plan.json \
+            --working-dir example/random-test \
+            --format markdown > summary.md || true
+          cat summary.md
+
+      - name: Comment on the PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('summary.md', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Gate on destructive changes
+        run: |
+          ./ponto summary \
+            --plan-json-path example/random-test/plan.json \
+            --working-dir example/random-test \
+            --format terminal
