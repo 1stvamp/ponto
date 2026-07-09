@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 // db is created; app (created) and logs (unchanged) both depend on db, so logs
@@ -27,6 +28,7 @@ func tuiTestGraph() Graph {
 
 func readyExplorer(t *testing.T) tuiModel {
 	t.Helper()
+	zone.NewGlobal() // the explorer view marks mouse zones during render
 	m := newTUIModel(&ponto{Graph: tuiTestGraph(), WorkingDir: ".", TfPath: "/bin/terraform"})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = next.(tuiModel)
