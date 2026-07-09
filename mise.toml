@@ -88,6 +88,19 @@ description = "Serve the bundled random-test example"
 depends = ["build:ui"]
 run = "go run . --working-dir example/random-test"
 
+[tasks."run:tui-example"]
+description = "Explore the bundled random-test example in the interactive TUI"
+# No build:ui dep: the TUI never serves the web UI, and the committed ui/dist
+# already satisfies the go:embed at compile time.
+run = "go run . --tui --working-dir example/random-test"
+
+[tasks."run:image-example"]
+description = "Render the bundled random-test example to a static image (build/ponto-example.svg)"
+# Needs the web UI: gen-image drives the served graph in headless chromium to
+# export it, so a chrome/chromium binary must be on PATH (not a mise tool).
+depends = ["build:ui"]
+run = "mkdir -p build && go run . --gen-image --working-dir example/random-test --output build/ponto-example"
+
 [tasks."run:docker"]
 description = "Run the standard Docker image against the current directory"
 run = 'docker run --rm -it -p 7668:7668 -v "$PWD:/src" ghcr.io/1stvamp/ponto'

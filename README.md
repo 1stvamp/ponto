@@ -225,6 +225,8 @@ The tasks cover both the native and Docker workflows:
 - `mise run fmt`: format the Go code.
 - `mise run ponto`: run Ponto natively, serving the web UI.
 - `mise run run:example`: serve the bundled `random-test` example.
+- `mise run run:tui-example`: explore the bundled `random-test` example in the interactive TUI.
+- `mise run run:image-example`: render the bundled `random-test` example to a static image (`build/ponto-example.svg`; needs a chrome/chromium binary on PATH).
 - `mise run run:docker`: run the standard Docker image against the current directory.
 
 Run `mise tasks` for the full list. If you would rather not use mise, the [Build from source](#build-from-source) steps above work on their own.
