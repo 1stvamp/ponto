@@ -1,18 +1,15 @@
 <template>
-  <transition name="graph">
-    <fieldset>
-      <legend>Graph</legend>
-      <p v-if="noChangeNote" class="graph-note">
-        No resource changes in this plan, so the full graph is shown.
-      </p>
-      <p v-if="guardActive" class="graph-note">
-        Showing all {{ graph.nodes.length }} resources. Large graphs can be slow
-        to render in the browser; for big plans the static image
-        (<code>-genImage</code>) is faster.
-      </p>
-      <cytoscape ref="cy" :config="config" :preConfig="preConfig"></cytoscape>
-    </fieldset>
-  </transition>
+  <div class="graph-canvas">
+    <p v-if="noChangeNote" class="graph-note">
+      No resource changes in this plan, so the full graph is shown.
+    </p>
+    <p v-if="guardActive" class="graph-note">
+      Showing all {{ graph.nodes.length }} resources. Large graphs can be slow
+      to render in the browser; for big plans the static image
+      (<code>-genImage</code>) is faster.
+    </p>
+    <cytoscape ref="cy" :config="config" :preConfig="preConfig"></cytoscape>
+  </div>
 </template>
 
 <script>
@@ -20,7 +17,6 @@ import { saveAs } from "file-saver";
 import klay from "cytoscape-klay";
 import svg from 'cytoscape-svg';
 import nodeHtmlLabel from "cytoscape-node-html-label";
-import axios from "axios";
 
 const config = {
   autounselectify: true,
@@ -38,10 +34,12 @@ const config = {
       selector: "edge",
       css: {
         "curve-style": "taxi",
-        "line-fill": "linear-gradient",
-        "line-gradient-stop-colors": "data(gradient)",
-        "line-dash-offset": 24,
-        width: 10,
+        "line-color": "#4D525B",
+        "target-arrow-color": "#5F6570",
+        "target-arrow-shape": "triangle",
+        "arrow-scale": 1.2,
+        opacity: 0.5,
+        width: 6,
       },
     },
     {
@@ -53,8 +51,9 @@ const config = {
         shape: "roundrectangle",
         "min-height": "400px",
         "border-width": 2,
-        "border-color": "white",
-        "background-color": "#f4ecff",
+        "border-color": "#272A2E",
+        color: "#878C99",
+        "background-color": "#121317",
       },
     },
     {
@@ -65,8 +64,9 @@ const config = {
         "font-weight": "bold",
         shape: "roundrectangle",
         "border-width": 1,
-        "border-color": "lightgrey",
-        "background-color": "white",
+        "border-color": "#272A2E",
+        color: "#878C99",
+        "background-color": "#15171A",
       },
     },
     {
@@ -88,10 +88,10 @@ const config = {
         "font-weight": "bold",
         "text-margin-y": 60,
         shape: "roundrectangle",
-        color: "#8450ba",
-        "border-width": 10,
-        "border-color": "#8450ba",
-        "background-color": "white",
+        color: "#A78BFA",
+        "border-width": 4,
+        "border-color": "#A78BFA",
+        "background-color": "#121317",
       },
     },
     {
@@ -100,14 +100,15 @@ const config = {
         padding: "10%",
         width: "label",
         "font-weight": "bold",
-        "text-background-color": "white",
+        color: "#B5B8C0",
+        "text-background-color": "#15171A",
         "text-background-opacity": 1,
         "text-background-padding": "2em",
         "text-margin-y": 15,
         shape: "roundrectangle",
-        "border-width": "5px",
-        "border-color": "black",
-        "background-color": "white",
+        "border-width": "3px",
+        "border-color": "#272A2E",
+        "background-color": "#15171A",
         // "text-background-color": "data(parentColor)",
         // "background-color": "data(parentColor)",
       },
@@ -115,64 +116,64 @@ const config = {
     {
       selector: ".data-name",
       css: {
-        "background-color": "#ffecec",
-        color: "black",
         "font-weight": "bold",
         "text-valign": "center",
         "text-halign": "center",
         padding: "1.5em",
         shape: "roundrectangle",
         "border-opacity": 1,
-        "border-width": 5,
-        "border-color": "#dc477d",
+        "border-width": 3,
+        "border-color": "#FF7AD9",
+        "background-color": "#1A1B1F",
+        color: "#E8E9EC",
         label: "data(label)",
       },
     },
     {
       selector: ".output",
       css: {
-        "background-color": "#fff7e0",
-        color: "black",
+        "background-color": "#1A1B1F",
+        color: "#E8E9EC",
         "font-weight": "bold",
         "text-valign": "center",
         "text-halign": "center",
         padding: "1.5em",
         shape: "roundrectangle",
         "border-opacity": 1,
-        "border-width": 5,
-        "border-color": "#ffc107",
+        "border-width": 3,
+        "border-color": "#F5D547",
         label: "data(label)",
       },
     },
     {
       selector: ".variable",
       css: {
-        "background-color": "#e1f0ff",
-        color: "black",
+        "background-color": "#1A1B1F",
+        color: "#E8E9EC",
         "font-weight": "bold",
         "text-valign": "center",
         "text-halign": "center",
         padding: "1.5em",
         shape: "roundrectangle",
         "border-opacity": 1,
-        "border-width": 5,
-        "border-color": "#1d7ada",
+        "border-width": 3,
+        "border-color": "#68BAF2",
         label: "data(label)",
       },
     },
     {
       selector: ".locals",
       css: {
-        "background-color": "black",
-        color: "white",
+        "background-color": "#1A1B1F",
+        color: "#E8E9EC",
         "font-weight": "bold",
         "text-valign": "center",
         "text-halign": "center",
         padding: "1.5em",
         shape: "roundrectangle",
         "border-opacity": 1,
-        "border-width": 5,
-        "border-color": "black",
+        "border-width": 3,
+        "border-color": "#878C99",
         label: "data(label)",
       },
     },
@@ -182,14 +183,15 @@ const config = {
         padding: "10%",
         width: "label",
         "font-weight": "bold",
-        "text-background-color": "white",
+        color: "#B5B8C0",
+        "text-background-color": "#15171A",
         "text-background-opacity": 1,
         "text-background-padding": "2em",
         "text-margin-y": 15,
         shape: "roundrectangle",
-        "border-width": "5px",
-        "border-color": "black",
-        "background-color": "white",
+        "border-width": "3px",
+        "border-color": "#272A2E",
+        "background-color": "#15171A",
         // "text-background-color": "data(parentColor)",
         // "background-color": "data(parentColor)",
       },
@@ -200,14 +202,15 @@ const config = {
         padding: "10%",
         width: "label",
         "font-weight": "bold",
-        "text-background-color": "white",
+        color: "#B5B8C0",
+        "text-background-color": "#15171A",
         "text-background-opacity": 1,
         "text-background-padding": "2em",
         "text-margin-y": 15,
         shape: "roundrectangle",
-        "border-width": "5px",
-        "border-color": "black",
-        "background-color": "white",
+        "border-width": "3px",
+        "border-color": "#272A2E",
+        "background-color": "#15171A",
         // "text-background-color": "data(parentColor)",
         // "background-color": "data(parentColor)",
       },
@@ -219,9 +222,11 @@ const config = {
         "text-halign": "center",
         padding: "1.5em",
         shape: "roundrectangle",
-        "border-opacity": 0,
-        color: "white",
-        "background-color": "#8450ba",
+        "border-opacity": 1,
+        "border-width": "3px",
+        "border-color": "#272A2E",
+        color: "#E8E9EC",
+        "background-color": "#1A1B1F",
         "text-wrap": "ellipsis",
         "text-max-width": 500,
       },
@@ -229,44 +234,48 @@ const config = {
     {
       selector: ".create",
       css: {
-        "background-color": "#28a745",
-        color: "white",
+        "background-color": "#1A1B1F",
+        color: "#E8E9EC",
+        "border-color": "#4EE88E",
         "font-weight": "bold",
       },
     },
     {
       selector: ".delete",
       css: {
-        "background-color": "#e40707",
-        color: "white",
+        "background-color": "#1A1B1F",
+        color: "#E8E9EC",
+        "border-color": "#FB5C78",
         "font-weight": "bold",
       },
     },
     {
       selector: ".update",
       css: {
-        "background-color": "#1d7ada",
-        color: "white",
+        "background-color": "#1A1B1F",
+        color: "#E8E9EC",
+        "border-color": "#60A5FA",
         "font-weight": "bold",
       },
     },
     {
       selector: ".replace",
       css: {
-        "background-color": "#ffc107",
-        color: "black",
+        "background-color": "#1A1B1F",
+        color: "#E8E9EC",
+        "border-color": "#FBBF24",
         "font-weight": "bold",
       },
     },
     {
       selector: ".no-op",
       css: {
-        color: "black",
+        color: "#B5B8C0",
         "border-opacity": 1,
         "font-weight": "bold",
-        "border-width": "5px",
-        "border-color": "lightgray",
-        "background-color": "white",
+        "border-width": "3px",
+        "border-color": "#272A2E",
+        "background-color": "#1A1B1F",
       },
     },
     {
@@ -306,22 +315,32 @@ const config = {
 export default {
   name: "Graph",
   props: {
-    // When false (default) the graph shows only changed resources plus the
-    // resources connected to them (see #6). When true it shows everything.
-    showUnchanged: { type: Boolean, default: false },
+    // The plan graph payload (nodes + edges), passed from App.
+    graph: { type: Object, default: () => ({ nodes: [], edges: [] }) },
+    model: { type: Object, default: () => ({}) },
+    selectedId: { type: String, default: "" },
+    // When true (default) show only changed resources plus the resources
+    // connected to them (see #6). When false show everything.
+    changedOnly: { type: Boolean, default: true },
+    actionFilter: { type: String, default: "all" },
+    cbSafe: { type: Boolean, default: false },
   },
   data() {
     return {
       selectedNode: "",
       config,
-      graph: {},
       guardActive: false,
       noChangeNote: false,
     };
   },
   watch: {
-    showUnchanged() {
-      if (this.graph && this.graph.nodes) {
+    changedOnly() {
+      if (this.graph && this.graph.nodes && this.graph.nodes.length) {
+        this.renderGraph();
+      }
+    },
+    graph() {
+      if (this.graph && this.graph.nodes && this.graph.nodes.length) {
         this.renderGraph();
       }
     },
@@ -436,11 +455,11 @@ export default {
       this.guardActive = false;
 
       let nodes, renderEdges;
-      if (this.showUnchanged || changed.length === 0) {
+      if (!this.changedOnly || changed.length === 0) {
         nodes = this.graph.nodes;
         renderEdges = edges;
         this.noChangeNote = changed.length === 0;
-        this.guardActive = this.showUnchanged && this.graph.nodes.length > 500;
+        this.guardActive = !this.changedOnly && this.graph.nodes.length > 500;
       } else {
         const keep = this.changedSubset(changed, edges);
         nodes = this.graph.nodes.filter((n) => keep.has(n.data.id));
@@ -528,7 +547,7 @@ export default {
           vm.highlightNodePaths(n);
         }
 
-        vm.$emit("getNode", node.id);
+        vm.$emit("select", node.id);
       });
 
       // Add hover event
@@ -607,36 +626,36 @@ export default {
     },
   },
   mounted() {
-    // if graph.js file is present (standalone mode)
-    // eslint-disable-next-line no-undef
-    if (typeof graph !== "undefined") {
-      // eslint-disable-next-line no-undef
-      this.graph = graph;
+    // App passes the graph payload as a prop; render once it has arrived. The
+    // graph watcher covers the async case where the prop lands after mount.
+    if (this.graph && this.graph.nodes && this.graph.nodes.length) {
       this.renderGraph();
-    } else {
-      axios.get(`/api/graph`).then((response) => {
-        this.graph = response.data;
-        //console.log(this.graph)
-        this.renderGraph();
-      });
     }
   },
 };
 </script>
 
 <style>
+.graph-canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
 .graph-note {
-  margin: 0 0 0.5em;
+  margin: 8px;
   padding: 0.4em 0.6em;
   font-size: 0.85em;
-  background-color: #fff8e1;
-  border: 1px solid #ffe082;
+  color: #e8e9ec;
+  background-color: #2a2410;
+  border: 1px solid #4d4413;
   border-radius: 0.25em;
 }
 
 #cytoscape-div {
-  height: 1000px !important;
-  background-color: #f8f8f8 !important;
+  height: 100% !important;
+  min-height: 800px;
+  background-color: #15171a !important;
 }
 
 .node {
