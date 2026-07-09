@@ -1,508 +1,449 @@
 <template>
-  <fieldset id="resource-details">
-    <legend>Details</legend>
-    <div class="resource-detail">
-      <div v-if="!resourceID">
-        <span>Please select a resource on your right.</span>
+  <div class="detail">
+    <button v-if="narrow" class="rail-close" @click="$emit('close')">✕</button>
+
+    <!-- Selected resource -->
+    <div v-if="sel" class="dt">
+      <div class="dt-head">
+        <span class="pill" :style="pillStyle">{{ glyph }} {{ actionLabel }}</span>
+        <span class="tag" :style="{ color: kindColor }">{{ kindTag }}</span>
+        <span v-if="line" class="line">line #{{ line }}</span>
       </div>
-      <div v-else>
-        <dd class="key">{{ primitiveType }}</dd>
-        <span
-          class="tag is-small resource-action"
-          v-if="resourceChange.action"
-          >{{ resourceChange.action }}</span
+
+      <div class="dt-id">
+        <span class="idtext">{{ sel }}</span>
+        <button class="copy" @click="copy">{{ copied ? "Copied" : "Copy" }}</button>
+      </div>
+      <div v-if="typeLine" class="typeline">{{ typeLine }}</div>
+
+      <div class="rel">
+        <div class="rel-label">DEPENDS ON</div>
+        <div v-if="depends.length === 0" class="rel-empty">nothing</div>
+        <div
+          v-for="d in depends"
+          :key="'dep' + d.id"
+          class="rel-row"
+          @click="$emit('select', d.id)"
         >
-        <dt class="value resource-id">
-          {{ resource.id }}
-          <button
-            class="copy-button"
-            @click="copyText(resource.id, 'rid')"
-            ref="rid"
-          >
-            Copy
-          </button>
-        </dt>
-
-        <!-- <dd class="key">Resource Type</dd>
-        <dt class="value">{{ resource.resource_type }}</dt>
-c
-        <dd class="key">Resource Name</dd>
-        <dt class="value">{{ resource.resource_name }}</dt> -->
-
-        <nav class="tabs is-full">
-          <a
-            @click="selectTab('config')"
-            :class="{ active: curTab === 'config' }"
-            >Config</a
-          >
-          <a
-            @click="selectTab('current')"
-            :class="{ active: curTab === 'current', disabled: hasNoState }"
-            >Current State</a
-          >
-          <a
-            @click="selectTab('proposed')"
-            :class="{ active: curTab === 'proposed', disabled: hasNoState }"
-            >Proposed State</a
-          >
-        </nav>
-
-        <div class="tab-container" v-if="curTab === 'config'">
-          <!-- {{ resourceConfig }} -->
-          <span
-            v-if="
-              resourceConfig.isChild == 'ponto-for-each-child-resource-true'
-            "
-            class="is-child-resource"
-            >Please check parent resource</span
-          >
-          <div v-for="(val, k) in resourceConfig" :key="k" v-else>
-            <dd class="key">{{ k }}</dd>
-            <dt class="value">
-              <span>{{ getConfigValue(val) }}</span>
-              <button
-                class="copy-button"
-                @click="copyText(getConfigValue(val), `${resource.id}-${k}`)"
-                :ref="`${resource.id}-${k}`"
-              >
-                Copy
-              </button>
-            </dt>
-          </div>
+          <span class="rg" :style="{ color: d.color }">{{ d.glyph }}</span>{{ d.id }}
         </div>
+      </div>
 
-        <div class="tab-container" v-if="curTab === 'current'">
-          <span v-if="resourceChange.before">
-            <div v-for="(val, k) in resourceChange.before" :key="k">
-              <dd class="key">{{ k }}</dd>
-              <dt class="value">
-                {{ getBeforeValue(val) }}
-                <button
-                  class="copy-button"
-                  @click="copyText(getBeforeValue(val), `${resource.id}-${k}`)"
-                  :ref="`${resource.id}-${k}`"
-                >
-                  Copy
-                </button>
-              </dt>
-            </div>
-          </span>
-          <span v-else>Resource doesn't currently exist.</span>
+      <div class="rel">
+        <div class="rel-label">BLAST RADIUS <span class="rl-sub">— depended on by</span></div>
+        <div v-if="dependents.length === 0" class="rel-empty">nothing</div>
+        <div
+          v-for="d in dependents"
+          :key="'dpt' + d.id"
+          class="rel-row"
+          @click="$emit('select', d.id)"
+        >
+          <span class="rg" :style="{ color: d.color }">{{ d.glyph }}</span>{{ d.id }}
         </div>
+      </div>
 
-        <div class="tab-container" v-if="curTab === 'proposed'">
-          <!-- {{ resourceChange }} -->
-
-          <div v-for="(val, k) in resourceChange.after" :key="k">
-            <dd class="key">{{ k }}</dd>
-            <dt
-              class="value"
-              v-if="val"
-              :class="{ 'unknown-value': val.unknown }"
-            >
-              {{ val.unknown ? "Value Unknown" : val }}
-              <button
-                class="copy-button"
-                @click="copyText(getBeforeValue(val), `${resource.id}-${k}`)"
-                :ref="`${resource.id}-${k}`"
-              >
-                Copy
-              </button>
-            </dt>
-            <dt class="value" v-else>null</dt>
-          </div>
+      <div class="tabs">
+        <button :class="{ active: tab === 'config' }" @click="tab = 'config'">Config</button>
+        <button :class="{ active: tab === 'current' }" @click="tab = 'current'">Current State</button>
+        <button :class="{ active: tab === 'proposed' }" @click="tab = 'proposed'">Proposed State</button>
+      </div>
+      <div class="tab-body">
+        <div v-if="tabRows.length === 0" class="tab-empty">{{ tabEmpty }}</div>
+        <div v-for="kv in tabRows" :key="kv.key" class="kv">
+          <div class="k">{{ kv.key }}</div>
+          <div class="v" :class="{ dim: kv.dim }">{{ kv.value }}</div>
         </div>
       </div>
     </div>
-  </fieldset>
+
+    <!-- Overview when nothing is selected -->
+    <div v-else class="ov">
+      <div class="ov-title">PLAN OVERVIEW</div>
+      <div
+        v-for="o in overviewRows"
+        :key="o.label"
+        class="ov-row"
+        :style="{ borderLeftColor: o.count === 0 ? '#2C3034' : o.color }"
+      >
+        <span class="ov-count">{{ o.count }}</span>
+        <span class="ov-glyph" :style="{ color: o.count === 0 ? '#4D525B' : o.color }">{{ o.glyph }}</span>
+        <span class="ov-label">{{ o.label }}</span>
+      </div>
+
+      <div class="ov-title">LEGEND</div>
+      <div class="legend">
+        <div v-for="k in legend" :key="k.tag" class="lg">
+          <span class="lg-tag" :style="{ color: k.color }">{{ k.tag }}</span>
+          <span class="lg-label">{{ k.label }}</span>
+        </div>
+      </div>
+
+      <div class="hint">Click a node in the graph or a row in the list to inspect it.</div>
+    </div>
+  </div>
 </template>
 
 <script>
-import axios from "axios";
-import copy from "copy-to-clipboard";
+import { ACT, KIND, actionColor, actionGlyph } from "@/model.js";
 
 export default {
   name: "ResourceDetail",
   props: {
-    resourceID: String,
+    model: { type: Object, required: true },
+    selectedId: String,
+    cbSafe: Boolean,
+    narrow: Boolean,
   },
   data() {
-    return {
-      curTab: "config",
-      overview: {},
-    };
-  },
-  methods: {
-    selectTab(tab) {
-      if (!this.hasNoState) {
-        this.curTab = tab;
-      }
-    },
-    copyText(text, ref) {
-      copy(text, {
-        onCopy: this.updateCopyText(ref),
-      });
-    },
-    updateCopyText(ref) {
-      // Use the first element if returns an array
-      if (Array.isArray(this.$refs[ref])) {
-        this.$refs[ref][0].innerText = "Copied";
-        setTimeout(() => {
-          this.$refs[ref][0].innerText = "Copy";
-        }, 1000);
-      } else {
-        this.$refs[ref].innerText = "Copied";
-        setTimeout(() => {
-          this.$refs[ref].innerText = "Copy";
-        }, 1000);
-      }
-    },
-    getConfigValue(val) {
-      if (val.references) {
-        return val.references.join(", ");
-      } else if (val.constant_value) {
-        return val.constant_value;
-      } else {
-        return val ? val : "null";
-      }
-    },
-    getBeforeValue(val) {
-      return val ? val : "null";
-    },
-    getAfterValue(val) {
-      return val ? val : "null";
-    },
-    getResourceConfig(resourceID, model, isChild) {
-      let configID = model.states[resourceID]?.config_id ? model.states[resourceID]?.config_id : resourceID.replace(/\[[^[\]]*\]/g, "");
-
-      let config;
-
-      if (isChild) return { isChild: "ponto-for-each-child-resource-true" };
-
-      // If variable, return variable config
-      if ((config = model.configs[configID]?.variable_config) !== undefined) {
-        return config;
-      }
-
-      // If output, return output config
-      if ((config = model.configs[configID]?.output_config) !== undefined) {
-        return config;
-      }
-
-      // If module, return module config
-      if ((config = model.configs[configID]?.module_config) !== undefined) {
-        return config;
-      }
-
-      if ((config = model.configs[configID]?.resource_config) !== undefined) {
-        return config;
-      }
-
-      return {};
-
-      
-      // Resource
-      /*if (isChild) return { isChild: "ponto-for-each-child-resource-true" };
-      if (model.resources[resourceID] && model.resources[resourceID].config) {
-        let trc = {};
-        if (model.resources[resourceID].config.for_each_expression) {
-          trc.for_each = model.resources[resourceID].config.for_each_expression;
-        }
-        if (model.resources[resourceID].config.count_expression) {
-          trc.count = model.resources[resourceID].config.count_expression;
-        }
-        return Object.assign(
-          trc,
-          model.resources[resourceID].config.expressions
-        );
-      }
-
-      // Defaults to returning empty object
-      return {};*/
-    },
-    getResourceChange(resourceID, model) {
-      // console.log(`resourceID: ${resourceID}`);
-      // console.log(model);
-
-      let rc = {};
-      if (resourceID.includes("var.")) {
-        return (rc = {});
-      }
-      if (resourceID.includes("output.")) {
-        //let id = resourceID;
-        if (model.states[resourceID] && model.states[resourceID].change) {
-          const c = model.states[resourceID].change;
-
-          if (c.actions) {
-            rc.action = c.actions.length > 1 ? "replace" : c.actions[0];
-          }
-          rc.before = c.before ? c.before : null;
-          rc.after = c.after ? c.after : {};
-
-          if (typeof rc.before === "string") {
-            rc.before = {
-              value: rc.before,
-            };
-          }
-
-          if (typeof rc.after === "string") {
-            rc.after = {
-              value: rc.after,
-            };
-          }
-
-          if (c["after_unknown"]) {
-            rc.after["value"] = { unknown: true };
-          }
-
-          // console.log(rc);
-
-          return rc;
-        }
-        return (rc = {});
-      }
-
-      // Resource
-      if (model.states[resourceID] && model.states[resourceID].change) {
-        const c = model.states[resourceID].change;
-
-        if (c.actions) {
-          rc.action = c.actions.length > 1 ? "replace" : c.actions[0];
-        }
-        rc.before = c.before ? c.before : {};
-        rc.after = c.after ? c.after : {};
-
-        if (c["after_unknown"]) {
-          Object.keys(c["after_unknown"]).forEach(function (k) {
-            rc.after[k] = { unknown: true };
-          });
-        }
-      }
-
-      return rc;
-    },
+    return { tab: "config", copied: false };
   },
   computed: {
-    resource() {
-      let resource = "";
-
-      // If no config version...
-      if (this.resourceID.startsWith("Resources/")) {
-        resource = this.resourceID.split("/").join(".");
-      } else {
-        resource = this.resourceID.split("/").slice(-2).join(".");
-      }
-
-      const rArray = resource.split(".");
-      const lastIndex = rArray.length - 1;
-
-      let resourceID = rArray.join(".");
-
-      // If no config version..
-      if (this.resourceID.startsWith("Resources/")) {
-        resourceID = rArray.slice(1).join(".");
-      }
-
-      /*if (
-        rArray[lastIndex - 1] == "output" &&
-        !resourceID.startsWith("output.")
-      ) {
-        resourceID = `output.${resourceID}`;
-      }
-
-      if (rArray[lastIndex - 1] == "local") {
-        resourceID = `local.${rArray[lastIndex]}`;
-      }
-
-      if (rArray[lastIndex - 1] == "var") {
-        resourceID = `var.${rArray[lastIndex]}`;
-      }
-
-      // If resourceID is a child only (no . in id)
-      if (resourceID.match(/^[\w-]+[[]/g) != null) {
-        resourceID = rArray.slice(1).join(".");
-      }*/
-
-      return {
-        fileName: `${rArray[0]}.${rArray[1]}`,
-        id: resourceID,
-        resource_type: rArray[lastIndex - 1],
-        resource_name: rArray[lastIndex],
-      };
+    sel() {
+      return this.selectedId;
     },
-    primitiveType() {
-      switch (this.resource.resource_type) {
-        case "output":
-        case "var":
-        case "local":
-          return this.resource.resource_type;
-        default:
-          if (this.resource.id.startsWith("data.")) {
-            return "data";
-          }
-          return "resource";
-      }
+    action() {
+      return this.model.action[this.sel] || "no-op";
     },
-    isChild() {
-      return this.resource.id.match(/\[[^[\]]*\]$/g) != null;
+    glyph() {
+      return actionGlyph(this.action);
     },
-    hasNoState() {
-      return this.resource.id.includes("var.");
+    actionLabel() {
+      return this.action || "no-op";
     },
-    resourceConfig() {
-
-
-      return this.getResourceConfig(this.resource.id, this.overview, this.isChild)
-
-      /*if (this.resource.id === "") {
-        return { action: "", before: {} };
-      }
-
-      if (!this.isChild) {
-        // If it's part of a module
-        if (this.resource.id.startsWith("module.")) {
-          return this.getResourceConfig(
-            this.resource.id,
-            this.overview.resources[this.resource.parentID].module_config,
-            false
-          );
-        }
-        return this.getResourceConfig(this.resource.id, this.overview, false);
-      }
-
-      // If it's part of a module
-      if (this.resource.id.startsWith("module.")) {
-        return this.getResourceConfig(
-          this.resource.id,
-          this.overview.resources[this.resource.parentID].module_config,
-          true
-        );
-      }
-      return this.getResourceConfig(this.resource.id, this.overview, false);
-      // return this.isChild;*/
+    aColor() {
+      return actionColor(this.action, this.cbSafe);
     },
-    resourceChange() {
-
-      return this.getResourceChange(this.resource.id, this.overview);
-
+    pillStyle() {
+      return { color: this.aColor, background: this.aColor + "1F", borderColor: this.aColor + "55" };
+    },
+    kindDef() {
+      return KIND[this.model.kind[this.sel]] || KIND.resource;
+    },
+    kindTag() {
+      return this.kindDef.tag;
+    },
+    kindColor() {
+      return this.kindDef.c;
+    },
+    line() {
+      return this.model.lines[this.sel] || 0;
+    },
+    typeLine() {
+      const rt = this.model.rtype[this.sel];
+      if (!rt) return "";
+      const kind = this.model.kind[this.sel];
+      return rt + (kind === "data" ? " · data source" : " · managed resource");
+    },
+    depends() {
+      return this.relRows(this.model.deps[this.sel] || []);
+    },
+    dependents() {
+      return this.relRows(this.model.dependents[this.sel] || []);
+    },
+    overviewRows() {
+      const c = this.model.counts;
+      const defs = [
+        ["create", "add"],
+        ["update", "change"],
+        ["delete", "destroy"],
+        ["replace", "replace"],
+      ];
+      return defs.map(([a, label]) => ({
+        label,
+        count: c[a] || 0,
+        glyph: ACT[a].g,
+        color: actionColor(a, this.cbSafe),
+      }));
+    },
+    legend() {
+      return [
+        { tag: "RES", label: "Resource", color: KIND.resource.c },
+        { tag: "DATA", label: "Data source", color: KIND.data.c },
+        { tag: "VAR", label: "Variable", color: KIND.variable.c },
+        { tag: "OUT", label: "Output", color: KIND.output.c },
+        { tag: "MOD", label: "Module", color: KIND.module.c },
+        { tag: "LOCAL", label: "Local", color: KIND.local.c },
+      ];
+    },
+    tabEmpty() {
+      if (this.tab === "config") return "No configurable attributes.";
+      if (this.tab === "current") {
+        return this.action === "create" ? "Resource doesn't currently exist." : "No current state.";
+      }
+      return this.action === "delete" ? "Resource will be destroyed." : "No proposed state.";
+    },
+    tabRows() {
+      if (this.tab === "config") {
+        return (this.model.config[this.sel] || []).map((kv) => ({ key: kv.key, value: kv.value, dim: false }));
+      }
+      const st = this.model.states[this.sel];
+      const vals = st && st.values ? st.values : {};
+      return Object.keys(vals)
+        .sort()
+        .map((k) => {
+          const v = vals[k];
+          const empty = v === null || v === undefined;
+          return { key: k, value: empty ? "(known after apply)" : format(v), dim: empty };
+        });
     },
   },
   watch: {
-    resourceID: function (newVal) {
-      if (newVal.includes("var.")) {
-        this.curTab = "config";
-      }
+    selectedId() {
+      this.copied = false;
+      this.tab = "config";
     },
   },
-  mounted() {
-    // if rso.js file is present (standalone mode)
-    // eslint-disable-next-line no-undef
-    if (typeof rso !== "undefined") {
-      // eslint-disable-next-line no-undef
-      this.overview = rso;
-    } else {
-      axios.get(`/api/rso`).then((response) => {
-        this.overview = response.data;
-        //console.log(this.overview);
-      });
-    }
+  methods: {
+    relRows(ids) {
+      const seen = {};
+      const out = [];
+      for (const id of ids) {
+        if (seen[id]) continue;
+        seen[id] = true;
+        const a = this.model.action[id] || "no-op";
+        out.push({ id, glyph: actionGlyph(a), color: actionColor(a, this.cbSafe) });
+      }
+      return out.sort((x, y) => x.id.localeCompare(y.id));
+    },
+    copy() {
+      try {
+        navigator.clipboard && navigator.clipboard.writeText(this.sel);
+      } catch (e) {
+        /* clipboard unavailable */
+      }
+      this.copied = true;
+      setTimeout(() => (this.copied = false), 1200);
+    },
   },
 };
+
+function format(v) {
+  if (typeof v === "string") return v;
+  return JSON.stringify(v);
+}
 </script>
 
 <style scoped>
-#resource-details {
-  position: sticky;
-  top: 1em;
-  min-width: 0;
-  /* background-color: #292a34; */
+.detail {
+  padding: 14px;
+  position: relative;
 }
-.tab-container {
-  max-height: 70vh;
-  overflow: scroll;
-}
-fieldset {
-  margin-bottom: 2em;
-}
-.tabs a:hover {
+.rail-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text-def);
+  border-radius: 3px;
+  width: 24px;
+  height: 24px;
   cursor: pointer;
 }
-.resource-detail {
-  padding: 1em 0;
-}
-.tab-container {
-  padding: 1em 0;
-}
-.tabs .disabled:hover {
-  cursor: not-allowed;
-  border-bottom: 4px solid var(--color-lightGrey);
-}
 
-p {
-  word-break: break-all;
-  white-space: normal;
-}
-
-a {
-  font-weight: bold;
-  border-width: 4px !important;
-}
-
-.key {
-  font-weight: bold;
-  font-size: 0.9em;
-  text-transform: uppercase;
-  margin: 0;
-}
-
-dd {
-  display: inline-block;
-}
-
-dt.value {
-  margin: 0.5em 0 1em 0;
-  padding: 0.5em;
-  font-size: 1em;
-  background-color: #f4ecff;
-  color: black;
+.dt-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 2px 8px;
+  border: 1px solid;
+  border-radius: 3px;
+  font-family: var(--mono);
+}
+.tag {
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.line {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 11px;
 }
 
-.resource-id {
-  word-wrap: break-word;
-  overflow: hidden;
-  width: 100%;
+.dt-id {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
 }
-
-.resource-action {
-  float: right;
+.idtext {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-all;
+  flex: 1;
 }
-
-.is-child-resource {
-  display: block;
-  text-align: center;
-  font-weight: bold;
-  font-style: italic;
-}
-
-.unknown-value {
-  text-align: center;
-  font-weight: bold;
-  font-style: italic;
-}
-
-.copy-button {
-  font-size: 0.9em;
-  padding: 1rem;
-  align-items: flex-end;
-  background-color: #8450ba;
-  color: white;
-  font-weight: bold;
-}
-
-.copy-button:hover {
+.copy {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text-def);
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 3px 8px;
   cursor: pointer;
+}
+.typeline {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  margin-bottom: 14px;
+}
+
+.rel {
+  margin-bottom: 14px;
+}
+.rel-label {
+  font-size: 10.4px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.rel-label .rl-sub {
+  color: var(--text-faint);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.rel-empty {
+  color: var(--text-faint);
+  font-style: italic;
+  font-size: 12px;
+}
+.rel-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-def);
+  padding: 2px 0;
+  cursor: pointer;
+}
+.rel-row:hover {
+  color: var(--text);
+}
+.rel-row .rg {
+  font-weight: 600;
+  width: 10px;
+  text-align: center;
+}
+
+.tabs {
+  display: flex;
+  gap: 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.tabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  padding: 6px 0;
+  cursor: pointer;
+  font-size: 12px;
+}
+.tabs button.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.tab-empty {
+  color: var(--text-faint);
+  font-size: 12px;
+  font-style: italic;
+}
+.kv {
+  margin-bottom: 8px;
+}
+.kv .k {
+  font-size: 10.4px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 3px;
+}
+.kv .v {
+  background: var(--bg-elev);
+  border: 1px solid var(--bg-sel);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-def);
+  word-break: break-all;
+}
+.kv .v.dim {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* overview */
+.ov-title {
+  font-size: 10.4px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin: 6px 0 8px;
+}
+.ov-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px;
+  border-left: 2px solid;
+  background: var(--bg-elev);
+  border-radius: 0 4px 4px 0;
+  margin-bottom: 6px;
+}
+.ov-count {
+  font-size: 22px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  min-width: 24px;
+}
+.ov-glyph {
+  font-family: var(--mono);
+  font-weight: 600;
+}
+.ov-label {
+  color: var(--text-def);
+}
+.legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.lg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  background: var(--bg-elev);
+  border-left: 2px solid;
+  border-color: transparent;
+  border-radius: 3px;
+}
+.lg-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.lg-label {
+  color: var(--text-def);
+  font-size: 12px;
+}
+.hint {
+  color: var(--text-faint);
+  font-size: 12px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
 }
 </style>

@@ -1,92 +1,218 @@
 <template>
-  <nav class="nav">
-    <div class="nav-left">
-      <a class="title" href="https://github.com/1stvamp/ponto">
-        <h2>Ponto - Terraform Visualizer</h2>
-      </a>
+  <div class="titlebar">
+    <div class="tb-left">
+      <span class="mark"></span>
+      <span class="name">Ponto</span>
+      <span class="tagline">Terraform Visualizer</span>
     </div>
-    <div class="nav-right">
-      <a id="saveGraph" class="button outline" @click="saveGraph()"
-        >Save Graph</a
+
+    <div class="tb-center">
+      <span
+        v-for="c in summaryChips"
+        :key="c.label"
+        class="chip"
+        :class="{ zero: c.count === 0 }"
       >
-      <a id="savePng" class="button outline" @click="savePng()">Save PNG</a>
-      <label class="unchanged-toggle">
-        <input
-          id="showUnchanged"
-          type="checkbox"
-          v-model="showUnchanged"
-          @change="emitUnchanged"
-        />
-        Show unchanged
-      </label>
-      <!-- <a class="button outline" @click="toggleGraph()">{{
-        graph ? "Hide Graph" : "Show Graph"
-      }}</a> -->
-      <!-- <a class="button icon-only clear" @click="switchMode(this)">{{
-        colorMode
-      }}</a> -->
+        <span class="chip-glyph" :style="{ color: c.count === 0 ? '#5F6570' : c.color }">{{ c.glyph }}</span>
+        <span class="chip-count">{{ c.count }}</span>
+        <span class="chip-label">{{ c.label }}</span>
+      </span>
     </div>
-  </nav>
+
+    <div class="tb-right">
+      <button
+        class="cb-btn"
+        :class="{ on: cbSafe }"
+        title="Colour-blind-safe palette"
+        @click="$emit('toggleCb')"
+      >
+        <span class="cb-icon">◑</span> CB-safe
+      </button>
+      <div class="export">
+        <button class="export-btn" @click="exportOpen = !exportOpen">Export ▾</button>
+        <div v-if="exportOpen" class="export-menu" @mouseleave="exportOpen = false">
+          <button @click="pick('saveGraph')">Save graph as SVG</button>
+          <button @click="pick('savePng')">Save graph as PNG</button>
+          <button @click="pick('copySummary')">Copy plan summary</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script>
 export default {
   name: "MainNav",
+  props: {
+    counts: { type: Object, default: () => ({}) },
+    cbSafe: Boolean,
+    cbColor: { type: Function, default: () => "#fff" },
+    glyph: { type: Function, default: () => "·" },
+  },
   data() {
-    return {
-      colorMode: "☀️",
-      graph: true,
-      showUnchanged: false,
-    };
+    return { exportOpen: false };
+  },
+  computed: {
+    summaryChips() {
+      const defs = [
+        ["create", "to add"],
+        ["update", "to change"],
+        ["delete", "to destroy"],
+        ["replace", "to replace"],
+      ];
+      return defs.map(([action, label]) => ({
+        label,
+        count: this.counts[action] || 0,
+        glyph: this.glyph(action),
+        color: this.cbColor(action),
+      }));
+    },
   },
   methods: {
-    switchMode() {
-      const bodyClass = document.body.classList;
-      bodyClass.contains("dark")
-        ? ((this.colorMode = "☀️"), bodyClass.remove("dark"))
-        : ((this.colorMode = "🌙"), bodyClass.add("dark"));
-
-      localStorage.colorMode = this.colorMode;
+    pick(evt) {
+      this.exportOpen = false;
+      this.$emit(evt);
     },
-    // toggleGraph() {
-    //   this.graph = !this.graph;
-
-    //   this.$emit("toggleGraph", this.graph);
-    // },
-    saveGraph() {
-      this.$emit("saveGraph", true);
-    },
-    savePng() {
-      this.$emit("savePng", true);
-    },
-    emitUnchanged() {
-      this.$emit("toggleUnchanged", this.showUnchanged);
-    },
-  },
-  mounted() {
-    // Toggle dark mode
-    // if (localStorage.colorMode) {
-    //   this.colorMode = localStorage.colorMode;
-    // } else {
-    //   if (
-    //     window.matchMedia &&
-    //     window.matchMedia("(prefers-color-scheme: dark)").matches
-    //   ) {
-    //     this.colorMode = "🌙";
-    //   }
-    // }
-    // localStorage.colorMode = this.colorMode;
-    // if (this.colorMode === "☀️") {
-    //   document.body.classList.remove("dark");
-    // } else {
-    //   document.body.classList.add("dark");
-    // }
   },
 };
 </script>
 
 <style scoped>
-.title {
-  padding: 0;
+.titlebar {
+  height: 48px;
+  flex: 0 0 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.tb-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, #a8ff53, #28bf5c);
+  position: relative;
+}
+.mark::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #15171a;
+  border-radius: 2px;
+  top: 6px;
+  left: 6px;
+}
+.name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+.tagline {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.tb-center {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+.chip-glyph {
+  font-family: var(--mono);
+  font-weight: 600;
+}
+.chip-count {
+  color: var(--text);
+  font-family: var(--mono);
+}
+.chip-label {
+  color: var(--text-dim);
+}
+.chip.zero .chip-count,
+.chip.zero .chip-label {
+  color: var(--text-faint);
+}
+
+.tb-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cb-btn {
+  height: 30px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--text-def);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.cb-btn.on {
+  background: var(--bg-sel);
+  border-color: #3b3e45;
+  color: var(--text);
+}
+.cb-icon {
+  font-size: 13px;
+}
+
+.export {
+  position: relative;
+}
+.export-btn {
+  height: 30px;
+  padding: 0 12px;
+  background: #2c3034;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.export-menu {
+  position: absolute;
+  top: 34px;
+  right: 0;
+  min-width: 180px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+}
+.export-menu button {
+  text-align: left;
+  padding: 7px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text-def);
+  cursor: pointer;
+  font-size: 12px;
+}
+.export-menu button:hover {
+  background: var(--bg-sel);
+  color: var(--text);
 }
 </style>
