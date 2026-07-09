@@ -9,14 +9,14 @@ go = "1.24"       # go.mod (the charm TUI deps require go 1.24)
 node = "20"       # Dockerfile NODE_VERSION; the Vue 2 UI build needs this toolchain
 terraform = "1.5.7" # for running Ponto natively against a Terraform config
 
-[tasks.install]
+[tasks.deps]
 description = "Install the UI dependencies"
 dir = "ui"
 run = "npm install"
 
 [tasks."build:ui"]
 description = "Build the embedded web UI into ui/dist"
-depends = ["install"]
+depends = ["deps"]
 dir = "ui"
 # The Vue 2 / webpack 4 build needs the legacy OpenSSL provider on modern Node.
 env = { NODE_OPTIONS = "--openssl-legacy-provider" }
@@ -34,6 +34,36 @@ run = "docker buildx bake image-local"
 [tasks."build:docker-slim"]
 description = "Build the slim scratch + UPX Docker image"
 run = "docker buildx bake image-slim"
+
+[tasks.install]
+description = "Build and install the ponto binary to a user bin dir (--global for system-wide)"
+depends = ["build"]
+usage = 'flag "-g --global" help="Install to /usr/local/bin (system-wide, may need sudo) instead of the user bin dir"'
+run = '''
+case "$(uname -s 2>/dev/null || echo unknown)" in
+  Linux|Darwin|*BSD*)
+    if [ "${usage_global:-false}" = "true" ]; then
+      dest="/usr/local/bin"
+      install -m 0755 ponto "$dest/ponto" 2>/dev/null || sudo install -m 0755 ponto "$dest/ponto"
+    else
+      dest="${XDG_BIN_HOME:-$HOME/.local/bin}"
+      mkdir -p "$dest"
+      install -m 0755 ponto "$dest/ponto"
+    fi
+    echo "Installed ponto to $dest/ponto"
+    ;;
+  *)
+    # Windows and anything else: there's no standard user bin dir on PATH, so
+    # drop the binary in the gitignored build/ dir and let you place it.
+    out=ponto; [ -f ponto.exe ] && out=ponto.exe
+    mkdir -p build
+    cp "$out" "build/$out"
+    echo "Built build/$out."
+    echo "No standard user bin directory on this platform: move it onto your PATH"
+    echo "(e.g. create %USERPROFILE%\\bin, add it to PATH, and copy build/$out there)."
+    ;;
+esac
+'''
 
 [tasks.fmt]
 description = "Format the Go code"
