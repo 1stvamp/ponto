@@ -65,16 +65,80 @@ func main() {
 // resolveTfPath returns the terraform binary to use. An explicit --tf-path
 // wins; otherwise look up terraform then tofu on $PATH, falling back to the
 // container's /bin/terraform.
-func resolveTfPath(explicit string) string {
+func resolveTfPath(explicit, workingDir string) string {
 	if explicit != "" {
 		return explicit
 	}
-	for _, bin := range []string{"terraform", "tofu"} {
+	// A version-manager file (tfenv/tofuenv/asdf/mise) tells us whether the
+	// project is terraform or tofu; honour that, then fall back to the usual
+	// order. Either way the binary itself still comes from $PATH (which is
+	// where the version manager's shim lives).
+	order := []string{"terraform", "tofu"}
+	if preferredTfTool(workingDir) == "tofu" {
+		order = []string{"tofu", "terraform"}
+	}
+	for _, bin := range order {
 		if p, err := exec.LookPath(bin); err == nil {
 			return p
 		}
 	}
 	return "/bin/terraform"
+}
+
+// preferredTfTool returns "terraform" or "tofu" when a version-manager file in
+// workingDir, one of its parents, or $HOME says which the project uses. Empty
+// if nothing is found. Mirrors how tfenv/tofuenv/tenv search for their files.
+func preferredTfTool(workingDir string) string {
+	dir, err := filepath.Abs(workingDir)
+	if err != nil {
+		dir = workingDir
+	}
+	dirs := []string{}
+	for {
+		dirs = append(dirs, dir)
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		dirs = append(dirs, home)
+	}
+	for _, d := range dirs {
+		if tool := tfToolFromDir(d); tool != "" {
+			return tool
+		}
+	}
+	return ""
+}
+
+func tfToolFromDir(dir string) string {
+	// tofuenv / tfenv single-purpose files first.
+	if fileExists(filepath.Join(dir, ".opentofu-version")) {
+		return "tofu"
+	}
+	if fileExists(filepath.Join(dir, ".terraform-version")) || fileExists(filepath.Join(dir, ".tfswitchrc")) {
+		return "terraform"
+	}
+	// asdf / mise .tool-versions: a terraform or opentofu line.
+	if b, err := os.ReadFile(filepath.Join(dir, ".tool-versions")); err == nil {
+		for _, line := range strings.Split(string(b), "\n") {
+			switch fields := strings.Fields(line); {
+			case len(fields) == 0:
+			case fields[0] == "opentofu" || fields[0] == "tofu":
+				return "tofu"
+			case fields[0] == "terraform":
+				return "terraform"
+			}
+		}
+	}
+	return ""
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }
 
 func newRootCmd() *cobra.Command {
@@ -179,7 +243,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	r := ponto{
 		Name:             v.GetString("name"),
 		WorkingDir:       v.GetString("working-dir"),
-		TfPath:           resolveTfPath(v.GetString("tf-path")),
+		TfPath:           resolveTfPath(v.GetString("tf-path"), v.GetString("working-dir")),
 		PlanPath:         planPath,
 		PlanJSONPath:     planJSONPath,
 		ShowSensitive:    v.GetBool("show-sensitive"),
