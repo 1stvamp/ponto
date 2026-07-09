@@ -60,4 +60,4 @@ run = "go run . --working-dir example/random-test"
 
 [tasks."run:docker"]
 description = "Run the standard Docker image against the current directory"
-run = 'docker run --rm -it -p 9000:9000 -v "$PWD:/src" ghcr.io/1stvamp/ponto'
+run = 'docker run --rm -it -p 7668:7668 -v "$PWD:/src" ghcr.io/1stvamp/ponto'

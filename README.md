@@ -8,7 +8,7 @@ In order to do this, Ponto:
 
 1. generates a [`plan`](https://www.terraform.io/docs/cli/commands/plan.html#out-filename) file and parses the configuration in the root directory or uses a provided plan.
 1. parses the `plan` and configuration files to generate three items: the resource overview (`rso`), the resource map (`map`), and the resource graph (`graph`).
-1. consumes the `rso`, `map`, and `graph` to generate an interactive configuration and state visualization hosts on `0.0.0.0:9000`.
+1. consumes the `rso`, `map`, and `graph` to generate an interactive configuration and state visualization hosts on `0.0.0.0:7668`.
 
 ![Ponto Screenshot](docs/ponto-screenshot.png)
 
@@ -16,10 +16,10 @@ In order to do this, Ponto:
 
 The fastest way to get up and running with Ponto is through Docker.
 
-Run the following command in any Terraform workspace to generate a visualization. This command copies all the files in your current directory to the Ponto container and exposes port `:9000`.
+Run the following command in any Terraform workspace to generate a visualization. This command copies all the files in your current directory to the Ponto container and exposes port `:7668`.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v $(pwd):/src ghcr.io/1stvamp/ponto
+$ docker run --rm -it -p 7668:7668 -v $(pwd):/src ghcr.io/1stvamp/ponto
 2021/07/02 06:46:23 Starting Ponto...
 2021/07/02 06:46:23 Initializing Terraform...
 2021/07/02 06:46:24 Generating plan...
@@ -28,7 +28,7 @@ $ docker run --rm -it -p 9000:9000 -v $(pwd):/src ghcr.io/1stvamp/ponto
 2021/07/02 06:46:25 Generating resource map...
 2021/07/02 06:46:25 Generating resource graph...
 2021/07/02 06:46:25 Done generating assets.
-2021/07/02 06:46:25 Ponto is running on 0.0.0.0:9000
+2021/07/02 06:46:25 Ponto is running on 0.0.0.0:7668
 ```
 
 Or run it natively in a Terraform workspace, with `ponto` on your `PATH` (see [Installation](#installation)) and `terraform` or `tofu` available:
@@ -37,7 +37,7 @@ Or run it natively in a Terraform workspace, with `ponto` on your `PATH` (see [I
 $ ponto
 ```
 
-Once Ponto runs on `0.0.0.0:9000`, navigate to it to find the visualization!
+Once Ponto runs on `0.0.0.0:7668`, navigate to it to find the visualization!
 
 ### Run on Terraform plan file
 
@@ -53,7 +53,7 @@ $ terraform show -json plan.out > plan.json
 Then, run Ponto on it.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v $(pwd)/plan.json:/src/plan.json ghcr.io/1stvamp/ponto:latest --plan-json-path=plan.json
+$ docker run --rm -it -p 7668:7668 -v $(pwd)/plan.json:/src/plan.json ghcr.io/1stvamp/ponto:latest --plan-json-path=plan.json
 ```
 
 Or natively:
@@ -67,7 +67,7 @@ $ ponto --plan-json-path plan.json
 Standalone mode generates a `ponto.zip` file containing all the static assets.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" ghcr.io/1stvamp/ponto --standalone
+$ docker run --rm -it -p 7668:7668 -v "$(pwd):/src" ghcr.io/1stvamp/ponto --standalone
 ```
 
 Or natively:
@@ -89,7 +89,7 @@ $ printenv | grep "AWS" > .env
 Then, add it as environment variables to your Docker container with `--env-file`.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" --env-file ./.env ghcr.io/1stvamp/ponto
+$ docker run --rm -it -p 7668:7668 -v "$(pwd):/src" --env-file ./.env ghcr.io/1stvamp/ponto
 ```
 
 Running natively there's nothing extra to do: Ponto inherits your shell environment, so exported credentials are already available.
@@ -103,7 +103,7 @@ $ ponto
 Use `--tf-backend-config` to define backend config files and `--tf-vars-file` or `--tf-var` to define variables. For example, you can run the following in the `example/random-test` directory to overload variables.
 
 ```
-$ docker run --rm -it -p 9000:9000 -v "$(pwd):/src" ghcr.io/1stvamp/ponto --tf-backend-config test.tfbackend --tf-vars-file test.tfvars --tf-var max_length=4
+$ docker run --rm -it -p 7668:7668 -v "$(pwd):/src" ghcr.io/1stvamp/ponto --tf-backend-config test.tfbackend --tf-vars-file test.tfvars --tf-var max_length=4
 ```
 
 Or natively, from the `example/random-test` directory:
@@ -251,7 +251,7 @@ $ ponto
 2021/06/23 22:51:28 Generating resource map...
 2021/06/23 22:51:28 Generating resource graph...
 2021/06/23 22:51:28 Done generating assets.
-2021/06/23 22:51:28 Ponto is running on 0.0.0.0:9000
+2021/06/23 22:51:28 Ponto is running on 0.0.0.0:7668
 ```
 
 You can specify the working directory (where your configuration is living) and the Terraform binary location using flags.
@@ -260,4 +260,4 @@ You can specify the working directory (where your configuration is living) and t
 $ ponto --working-dir "example/eks-cluster" --tf-path "/Users/dos/terraform"
 ```
 
-Once Ponto runs on `0.0.0.0:9000`, navigate to it to find the visualization!
+Once Ponto runs on `0.0.0.0:7668`, navigate to it to find the visualization!
