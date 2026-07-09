@@ -193,6 +193,8 @@ func newRootCmd() *cobra.Command {
 	cmd.Flags().AddFlagSet(metaFlags)
 	cmd.MarkFlagsMutuallyExclusive("standalone", "gen-image", "tui")
 
+	cmd.AddCommand(newSummaryCmd())
+
 	// Allow --interactive as an alias for --tui.
 	cmd.Flags().SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		if name == "interactive" {
@@ -221,23 +223,16 @@ func newRootCmd() *cobra.Command {
 	return cmd
 }
 
-func run(cmd *cobra.Command, v *viper.Viper) error {
-	genImage := v.GetBool("gen-image")
-	imageFormat := v.GetString("image-format")
-	if genImage && imageFormat != "svg" && imageFormat != "png" {
-		return fmt.Errorf("invalid --image-format %q: must be \"svg\" or \"png\"", imageFormat)
-	}
-
-	log.Println("Starting Ponto...")
-
-	// Repeatable flags come from pflag directly; env binding is for scalars.
+// buildPonto constructs the ponto config from the resolved flags/env, shared by
+// the root command and the summary subcommand.
+func buildPonto(cmd *cobra.Command, v *viper.Viper) (ponto, error) {
 	tfVarsFiles, _ := cmd.Flags().GetStringArray("tf-vars-file")
 	tfVars, _ := cmd.Flags().GetStringArray("tf-var")
 	tfBackendConfigs, _ := cmd.Flags().GetStringArray("tf-backend-config")
 
 	path, err := os.Getwd()
 	if err != nil {
-		return errors.New("unable to get current working directory")
+		return ponto{}, errors.New("unable to get current working directory")
 	}
 
 	planPath := v.GetString("plan-path")
@@ -249,15 +244,13 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		planJSONPath = filepath.Join(path, planJSONPath)
 	}
 
-	r := ponto{
+	return ponto{
 		Name:             v.GetString("name"),
 		WorkingDir:       v.GetString("working-dir"),
 		TfPath:           resolveTfPath(v.GetString("tf-path"), v.GetString("working-dir")),
 		PlanPath:         planPath,
 		PlanJSONPath:     planJSONPath,
 		ShowSensitive:    v.GetBool("show-sensitive"),
-		GenImage:         genImage,
-		ImageFormat:      imageFormat,
 		Output:           v.GetString("output"),
 		Verbose:          v.GetBool("verbose"),
 		TfVarsFiles:      tfVarsFiles,
@@ -267,7 +260,81 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		TFCOrgName:       v.GetString("tfc-org"),
 		TFCWorkspaceName: v.GetString("tfc-workspace"),
 		TFCNewRun:        v.GetBool("tfc-new-run"),
+	}, nil
+}
+
+// newSummaryCmd is the `ponto summary` subcommand: a safety-graded plan digest.
+func newSummaryCmd() *cobra.Command {
+	inputFlags := pflag.NewFlagSet("input", pflag.ContinueOnError)
+	inputFlags.StringP("working-dir", "C", ".", "Path to the Terraform configuration")
+	inputFlags.StringP("plan-path", "p", "", "Path to a pre-generated binary plan file")
+	inputFlags.StringP("plan-json-path", "j", "", "Path to a pre-generated JSON plan file")
+	inputFlags.StringArrayP("tf-vars-file", "f", nil, "Path to a *.tfvars file (repeatable)")
+	inputFlags.StringArray("tf-var", nil, "Terraform variable, key=value (repeatable)")
+	inputFlags.StringArray("tf-backend-config", nil, "Path to a *.tfbackend file (repeatable)")
+	inputFlags.StringP("tf-path", "t", "", "Path to the terraform/tofu binary")
+	inputFlags.StringP("workspace", "w", "", "Terraform workspace name")
+	inputFlags.Bool("show-sensitive", false, "Display sensitive values")
+	inputFlags.BoolP("verbose", "v", false, "Verbose logging (stream terraform output)")
+
+	sumFlags := pflag.NewFlagSet("summary", pflag.ContinueOnError)
+	sumFlags.String("format", "terminal", "Output format: terminal, markdown or image")
+	sumFlags.String("emoji", "dots", "Emoji encoding: dots, signs or none")
+	sumFlags.StringP("output", "o", "ponto-summary", "Base name for the image card PNG (--format image)")
+
+	v := viper.New()
+
+	cmd := &cobra.Command{
+		Use:   "summary",
+		Short: "Print a safety-graded plan digest (Safe/Caution/Danger)",
+		Long: "Classify a Terraform plan into Safe / Caution / Danger tiers and render it\n" +
+			"as a terminal summary, a markdown PR comment, or an image card. Exits 2 when\n" +
+			"the plan is destructive, so it drops into CI as a change gate.",
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: false,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			r, err := buildPonto(cmd, v)
+			if err != nil {
+				return err
+			}
+			code, err := runSummary(&r, v.GetString("format"), v.GetString("emoji"), v.GetString("output"))
+			if err != nil {
+				return err
+			}
+			if code != 0 {
+				os.Exit(code)
+			}
+			return nil
+		},
 	}
+
+	cmd.Flags().AddFlagSet(inputFlags)
+	cmd.Flags().AddFlagSet(sumFlags)
+
+	v.SetEnvPrefix("PONTO")
+	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	v.AutomaticEnv()
+	v.BindPFlags(cmd.Flags())
+
+	return cmd
+}
+
+func run(cmd *cobra.Command, v *viper.Viper) error {
+	genImage := v.GetBool("gen-image")
+	imageFormat := v.GetString("image-format")
+	if genImage && imageFormat != "svg" && imageFormat != "png" {
+		return fmt.Errorf("invalid --image-format %q: must be \"svg\" or \"png\"", imageFormat)
+	}
+
+	log.Println("Starting Ponto...")
+
+	r, err := buildPonto(cmd, v)
+	if err != nil {
+		return err
+	}
+	r.GenImage = genImage
+	r.ImageFormat = imageFormat
 
 	// The TUI drives its own asset generation so it can show a spinner.
 	if v.GetBool("tui") {

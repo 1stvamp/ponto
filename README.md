@@ -153,6 +153,35 @@ Ponto reads `plan.json`, writes `ponto.svg`, and exits. Attach the SVG to the
 job output (add `--image-format png` if you'd rather attach a PNG). The plan JSON
 must be Unix (LF), UTF-8.
 
+### Plan safety summary
+
+`ponto summary` grades a plan into three tiers: Safe (creates and reads),
+Caution (in-place updates), and Danger (destroys and replaces). It rolls those
+up into a headline verdict, then renders the same model three ways: a terminal
+digest, a markdown PR comment, or a shareable image card. Destructive changes
+are triple-encoded (colour, emoji, glyph, and a text label) so they survive
+colour-blindness, greyscale, and emoji-less terminals.
+
+It exits `2` when the plan is destructive, so it drops straight into CI as a
+change gate (see `.github/workflows/plan-summary.yml` for a template).
+
+Docker:
+
+```shell
+$ docker run --rm -v "$(pwd):/src" ghcr.io/1stvamp/ponto summary --plan-json-path plan.json
+```
+
+Or natively, with `ponto` on the runner:
+
+```shell
+$ ponto summary --plan-json-path plan.json
+```
+
+Pick the renderer with `--format terminal|markdown|image` (default `terminal`),
+and the encoding with `--emoji dots|signs|none` (default `dots`). `--format image`
+writes a PNG (needs chromium, so use the standard image, not `:slim`); `--emoji none`
+still fully disambiguates via the glyph and the `[SAFE]/[CAUTION]/[DANGER]` labels.
+
 ## Installation
 
 You can download the Ponto binary specific to your system from the [Releases page](https://github.com/1stvamp/ponto/releases). Download the binary, unzip, then move `ponto` into your `PATH`.
@@ -227,6 +256,7 @@ The tasks cover both the native and Docker workflows:
 - `mise run run:example`: serve the bundled `random-test` example.
 - `mise run run:tui-example`: explore the bundled `random-test` example in the interactive TUI.
 - `mise run run:image-example`: render the bundled `random-test` example to a static image (`build/ponto-example.svg`; needs a chrome/chromium binary on PATH).
+- `mise run run:summary-example`: print the safety-graded plan summary for the bundled `random-test` example.
 - `mise run run:docker`: run the standard Docker image against the current directory.
 
 Run `mise tasks` for the full list. If you would rather not use mise, the [Build from source](#build-from-source) steps above work on their own.
