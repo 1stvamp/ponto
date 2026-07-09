@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG NODE_VERSION=20
-ARG GO_VERSION=1.23
+ARG GO_VERSION=1.24
 ARG TF_VERSION=1.5.5
 
 # Build UI

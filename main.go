@@ -145,6 +145,7 @@ func newRootCmd() *cobra.Command {
 	modeFlags := pflag.NewFlagSet("mode", pflag.ContinueOnError)
 	modeFlags.BoolP("standalone", "s", false, "Generate a standalone zip instead of serving")
 	modeFlags.BoolP("gen-image", "g", false, "Generate a graph image instead of serving")
+	modeFlags.BoolP("tui", "i", false, "Launch the interactive terminal UI instead of serving (alias: --interactive)")
 
 	inputFlags := pflag.NewFlagSet("input", pflag.ContinueOnError)
 	inputFlags.StringP("working-dir", "C", ".", "Path to the Terraform configuration")
@@ -190,7 +191,15 @@ func newRootCmd() *cobra.Command {
 	cmd.Flags().AddFlagSet(inputFlags)
 	cmd.Flags().AddFlagSet(outputFlags)
 	cmd.Flags().AddFlagSet(metaFlags)
-	cmd.MarkFlagsMutuallyExclusive("standalone", "gen-image")
+	cmd.MarkFlagsMutuallyExclusive("standalone", "gen-image", "tui")
+
+	// Allow --interactive as an alias for --tui.
+	cmd.Flags().SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
+		if name == "interactive" {
+			name = "tui"
+		}
+		return pflag.NormalizedName(name)
+	})
 
 	v.SetEnvPrefix("PONTO")
 	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
@@ -258,6 +267,11 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		TFCOrgName:       v.GetString("tfc-org"),
 		TFCWorkspaceName: v.GetString("tfc-workspace"),
 		TFCNewRun:        v.GetBool("tfc-new-run"),
+	}
+
+	// The TUI drives its own asset generation so it can show a spinner.
+	if v.GetBool("tui") {
+		return runTUI(&r)
 	}
 
 	if err := r.generateAssets(); err != nil {
