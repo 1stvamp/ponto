@@ -182,6 +182,15 @@ and the encoding with `--emoji dots|signs|none` (default `dots`). `--format imag
 writes a PNG (needs chromium, so use the standard image, not `:slim`); `--emoji none`
 still fully disambiguates via the glyph and the `[SAFE]/[CAUTION]/[DANGER]` labels.
 
+`--format tui` (an alias for `--format terminal --interactive`, or just `-i`)
+opens the summary in an interactive terminal view: move between resources with the
+arrows and expand any of them (`enter`, or click) to reveal its attribute diff,
+the way you would click a resource in the web UI.
+
+```shell
+$ ponto summary --plan-json-path plan.json --format tui
+```
+
 ## Installation
 
 You can download the Ponto binary specific to your system from the [Releases page](https://github.com/1stvamp/ponto/releases). Download the binary, unzip, then move `ponto` into your `PATH`.
@@ -257,6 +266,7 @@ The tasks cover both the native and Docker workflows:
 - `mise run run:tui-example`: explore the bundled `random-test` example in the interactive TUI.
 - `mise run run:image-example`: render the bundled `random-test` example to a static image (`build/ponto-example.svg`; needs a chrome/chromium binary on PATH).
 - `mise run run:summary-example`: print the safety-graded plan summary for the bundled `random-test` example.
+- `mise run run:summary-tui-example`: explore that summary interactively (expandable resources).
 - `mise run run:docker`: run the standard Docker image against the current directory.
 
 Run `mise tasks` for the full list. If you would rather not use mise, the [Build from source](#build-from-source) steps above work on their own.

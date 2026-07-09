@@ -278,9 +278,10 @@ func newSummaryCmd() *cobra.Command {
 	inputFlags.BoolP("verbose", "v", false, "Verbose logging (stream terraform output)")
 
 	sumFlags := pflag.NewFlagSet("summary", pflag.ContinueOnError)
-	sumFlags.String("format", "terminal", "Output format: terminal, markdown or image")
+	sumFlags.String("format", "terminal", "Output format: terminal, markdown, image or tui")
 	sumFlags.String("emoji", "dots", "Emoji encoding: dots, signs or none")
 	sumFlags.StringP("output", "o", "ponto-summary", "Base name for the image card PNG (--format image)")
+	sumFlags.BoolP("interactive", "i", false, "Explore the terminal summary interactively (alias: --format tui)")
 
 	v := viper.New()
 
@@ -298,7 +299,7 @@ func newSummaryCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			code, err := runSummary(&r, v.GetString("format"), v.GetString("emoji"), v.GetString("output"))
+			code, err := runSummary(&r, v.GetString("format"), v.GetString("emoji"), v.GetString("output"), v.GetBool("interactive"))
 			if err != nil {
 				return err
 			}
@@ -311,6 +312,17 @@ func newSummaryCmd() *cobra.Command {
 
 	cmd.Flags().AddFlagSet(inputFlags)
 	cmd.Flags().AddFlagSet(sumFlags)
+
+	// The root command sets a custom usage func that cobra otherwise propagates
+	// to subcommands; give summary its own so it lists its own flags.
+	cmd.SetUsageFunc(func(c *cobra.Command) error {
+		out := c.OutOrStderr()
+		fmt.Fprintf(out, "Usage:\n  ponto summary [flags]\n\n")
+		fmt.Fprintf(out, "Summary:\n%s\n", sumFlags.FlagUsages())
+		fmt.Fprintf(out, "Input:\n%s", inputFlags.FlagUsages())
+		fmt.Fprintf(out, "  -h, --help   Show this help\n")
+		return nil
+	})
 
 	v.SetEnvPrefix("PONTO")
 	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
