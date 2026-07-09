@@ -6,10 +6,13 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	tfjson "github.com/hashicorp/terraform-json"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 func summaryTUIFixture(t *testing.T) summaryTUIModel {
 	t.Helper()
+	zone.NewGlobal() // the model marks mouse zones during render
+
 	plan := &tfjson.Plan{
 		ResourceChanges: []*tfjson.ResourceChange{
 			rc("aws_db.primary", "", tfjson.Actions{tfjson.ActionDelete, tfjson.ActionCreate}, &tfjson.Change{
