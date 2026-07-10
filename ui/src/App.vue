@@ -82,22 +82,13 @@ import Graph from "@/components/Graph/Graph.vue";
 import Explorer from "@/components/Explorer.vue";
 import { build, actionColor, actionGlyph } from "@/model.js";
 
-// Standalone mode injects the payloads as top-level `const` globals (map.js /
-// rso.js / graph.js). Those are lexical bindings, not window properties, so we
-// read them by bare name; otherwise fall back to the API.
+// Standalone mode injects the payloads as window globals (map.js / rso.js /
+// graph.js). Read them from window; otherwise fall back to the API.
 function standaloneGlobals() {
   const g = {};
-  /* eslint-disable no-undef */
-  try {
-    if (typeof graph !== "undefined") g.graph = graph;
-  } catch (e) { /* not standalone */ }
-  try {
-    if (typeof map !== "undefined") g.map = map;
-  } catch (e) { /* not standalone */ }
-  try {
-    if (typeof rso !== "undefined") g.rso = rso;
-  } catch (e) { /* not standalone */ }
-  /* eslint-enable no-undef */
+  if (typeof window.graph !== "undefined") g.graph = window.graph;
+  if (typeof window.map !== "undefined") g.map = window.map;
+  if (typeof window.rso !== "undefined") g.rso = window.rso;
   return g;
 }
 

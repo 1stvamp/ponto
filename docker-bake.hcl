@@ -1,8 +1,8 @@
 variable "GO_VERSION" {
   default = "1.24"
 }
-variable "NODE_VERSION" {
-  default = "20"
+variable "BUN_VERSION" {
+  default = "1.3"
 }
 variable "TF_VERSION" {
   default = "1.5.5"
@@ -16,9 +16,9 @@ variable "VERSION" {
 
 target "_common" {
   args = {
-    GO_VERSION   = GO_VERSION
-    NODE_VERSION = NODE_VERSION
-    TF_VERSION   = TF_VERSION
+    GO_VERSION  = GO_VERSION
+    BUN_VERSION = BUN_VERSION
+    TF_VERSION  = TF_VERSION
   }
   labels = {
     "org.opencontainers.image.title"       = "ponto"

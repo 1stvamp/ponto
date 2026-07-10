@@ -1,18 +1,18 @@
 # syntax=docker/dockerfile:1
 
-ARG NODE_VERSION=20
+ARG BUN_VERSION=1.3
 ARG GO_VERSION=1.24
 ARG TF_VERSION=1.5.5
 
-# Build UI
-FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS ui
+# Build UI (bun, no Node)
+FROM --platform=$BUILDPLATFORM oven/bun:${BUN_VERSION}-alpine AS ui
 WORKDIR /src
-COPY ./ui/package*.json ./
-COPY ./ui/babel.config.js ./
-RUN npm set progress=false && npm config set depth 0 && npm install
+COPY ./ui/package.json ./ui/bun.lock ./
+RUN bun install --frozen-lockfile
+COPY ./ui/index.html ./ui/vite.config.js ./
 COPY ./ui/public ./public
 COPY ./ui/src ./src
-RUN NODE_OPTIONS='--openssl-legacy-provider' npm run build
+RUN bun --bun vite build
 
 # Build the ponto binary
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS build
