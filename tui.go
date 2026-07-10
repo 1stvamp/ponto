@@ -228,6 +228,7 @@ type tuiModel struct {
 	cbSafe       bool   // colour-blind-safe palette
 	hoverIndex   int    // list row under the mouse, or -1
 	focused      bool
+	helpOpen     bool // help pop-up shown
 
 	// derived from the graph, once assets are ready
 	resources    []resItem              // every resource, sorted
@@ -267,6 +268,16 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// While the help pop-up is open, keys only close it or quit.
+		if m.state == stateExplorer && m.helpOpen {
+			switch msg.String() {
+			case "?", "esc":
+				m.helpOpen = false
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			}
+			return m, nil
+		}
 		// While filtering, let the list consume keys (except it handles esc/enter itself).
 		if m.state == stateExplorer && m.list.FilterState() == list.Filtering {
 			var cmd tea.Cmd
@@ -283,8 +294,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case m.state == stateError:
 			return m, nil // any non-quit key ignored
 		case m.state == stateExplorer && key.Matches(msg, keys.Help):
-			m.help.ShowAll = !m.help.ShowAll
-			m.layout()
+			m.helpOpen = true
 			return m, nil
 		case m.state == stateExplorer && key.Matches(msg, keys.All):
 			m.showAll = !m.showAll
@@ -394,8 +404,7 @@ func (m *tuiModel) handleClick(msg tea.MouseMsg) tea.Cmd {
 	case in("foot-q"):
 		return tea.Quit
 	case in("foot-?"):
-		m.help.ShowAll = !m.help.ShowAll
-		m.layout()
+		m.helpOpen = true
 		return nil
 	case in("foot-a"):
 		m.showAll = !m.showAll
@@ -871,9 +880,6 @@ func (m *tuiModel) layout() {
 		return
 	}
 	helpHeight := 1
-	if m.help.ShowAll {
-		helpHeight = len(keys.FullHelp())
-	}
 	headerHeight := 2 // header line + action-filter bar
 	// account for pane borders (2) + header + help
 	bodyHeight := m.height - headerHeight - helpHeight - 2
@@ -907,18 +913,91 @@ func footerItems(bindings []key.Binding) string {
 	return strings.Join(parts, dimStyle.Render(" · "))
 }
 
-// footerFull renders grouped key hints across lines (expanded help).
-func footerFull(groups [][]key.Binding) string {
-	var lines []string
-	for _, g := range groups {
-		lines = append(lines, footerItems(g))
+// helpRow is one line in the help modal: a key hint and its description. An
+// empty key with a description is a section header; both empty is a spacer.
+type helpRow struct{ key, desc string }
+
+var explorerHelpRows = []helpRow{
+	{"", "Navigation"},
+	{"↑/↓, j/k", "move selection"},
+	{"wheel", "scroll the list"},
+	{"", ""},
+	{"", "Actions"},
+	{"/", "search resources"},
+	{"f", "filter by change action"},
+	{"t", "toggle tree / flat list"},
+	{"a", "toggle changed / all"},
+	{"", ""},
+	{"", "Mouse"},
+	{"click", "select a row, filter chip or footer item"},
+	{"hover", "highlight a row"},
+	{"", ""},
+	{"", "General"},
+	{"?", "toggle this help"},
+	{"q", "quit"},
+}
+
+var summaryHelpRows = []helpRow{
+	{"", "Navigation"},
+	{"↑/↓, j/k", "move between resources"},
+	{"wheel", "scroll"},
+	{"", ""},
+	{"", "Actions"},
+	{"enter, space", "expand / collapse the selected resource"},
+	{"e", "expand / collapse all"},
+	{"", ""},
+	{"", "Mouse"},
+	{"click", "select/expand a row, or run a footer item"},
+	{"hover", "highlight a row"},
+	{"", ""},
+	{"", "General"},
+	{"?", "toggle this help"},
+	{"q", "quit"},
+}
+
+// helpModal renders a centered help pop-up over a width×height screen.
+func helpModal(width, height int, title string, rows []helpRow) string {
+	keyStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#A8FF53"))
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#B5B8C0"))
+	headStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#878C99"))
+	ttlStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#E8E9EC"))
+
+	maxKey := 0
+	for _, r := range rows {
+		if r.key != "" && lipgloss.Width(r.key) > maxKey {
+			maxKey = lipgloss.Width(r.key)
+		}
 	}
-	return strings.Join(lines, "\n")
+
+	var b strings.Builder
+	b.WriteString(ttlStyle.Render(title) + "\n\n")
+	for _, r := range rows {
+		switch {
+		case r.key == "" && r.desc == "":
+			b.WriteString("\n")
+		case r.key == "":
+			b.WriteString(headStyle.Render(r.desc) + "\n")
+		default:
+			pad := strings.Repeat(" ", maxKey-lipgloss.Width(r.key))
+			b.WriteString("  " + keyStyle.Render(r.key) + pad + "   " + descStyle.Render(r.desc) + "\n")
+		}
+	}
+	b.WriteString("\n" + dimStyle.Render("press ? or esc to close"))
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#7655FD")).
+		Padding(1, 3).
+		Render(strings.TrimRight(b.String(), "\n"))
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
 }
 
 func (m tuiModel) explorerView() string {
 	if !m.ready {
 		return "loading…"
+	}
+	if m.helpOpen {
+		return helpModal(m.width, m.height, "Ponto — Plan Explorer", explorerHelpRows)
 	}
 	// header: Ponto + summary on the left, view mode on the right
 	filter := "changed + connected"
@@ -941,9 +1020,6 @@ func (m tuiModel) explorerView() string {
 	right := paneStyle.Render(m.detail.View())
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 	footer := footerItems(keys.ShortHelp())
-	if m.help.ShowAll {
-		footer = footerFull(keys.FullHelp())
-	}
 	if !m.focused {
 		footer = lipgloss.NewStyle().Faint(true).Render(footer)
 	}

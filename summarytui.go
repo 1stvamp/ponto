@@ -63,13 +63,14 @@ type summaryTUIModel struct {
 	expanded map[string]bool
 	cursor   int // index into flatRes
 
-	vp      viewport.Model
-	help    help.Model
-	ready   bool
-	focused bool
-	width   int
-	height  int
-	hover   int // flatRes index under the mouse, or -1
+	vp       viewport.Model
+	help     help.Model
+	ready    bool
+	focused  bool
+	helpOpen bool
+	width    int
+	height   int
+	hover    int // flatRes index under the mouse, or -1
 
 	headerHeight int
 	resStartLine []int // flatRes index -> first content line
@@ -120,6 +121,15 @@ func (m summaryTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.helpOpen {
+			switch msg.String() {
+			case "?", "esc":
+				m.helpOpen = false
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			}
+			return m, nil
+		}
 		switch {
 		case key.Matches(msg, summaryKeys.Quit):
 			return m, tea.Quit
@@ -136,9 +146,7 @@ func (m summaryTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toggleAll()
 			return m, m.startAnim()
 		case key.Matches(msg, summaryKeys.Help):
-			m.help.ShowAll = !m.help.ShowAll
-			m.layout()
-			m.rebuild()
+			m.helpOpen = true
 			return m, nil
 		}
 
@@ -173,9 +181,7 @@ func (m summaryTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case in("foot-q"):
 					return m, tea.Quit
 				case in("foot-?"):
-					m.help.ShowAll = !m.help.ShowAll
-					m.layout()
-					m.rebuild()
+					m.helpOpen = true
 					return m, nil
 				case in("foot-e"):
 					m.toggleAll()
@@ -483,6 +489,9 @@ func (m summaryTUIModel) View() string {
 	if !m.ready {
 		return "loading…"
 	}
+	if m.helpOpen {
+		return helpModal(m.width, m.height, "Ponto — Plan Summary", summaryHelpRows)
+	}
 	out := lipgloss.JoinVertical(lipgloss.Left,
 		m.headerView(),
 		m.vp.View(),
@@ -492,12 +501,9 @@ func (m summaryTUIModel) View() string {
 	return zone.Scan(out)
 }
 
-// footerView renders the clickable key hints (short, or expanded on ?).
+// footerView renders the clickable key hints.
 func (m summaryTUIModel) footerView() string {
 	footer := footerItems(summaryKeys.ShortHelp())
-	if m.help.ShowAll {
-		footer = footerFull(summaryKeys.FullHelp())
-	}
 	if !m.focused {
 		footer = lipgloss.NewStyle().Faint(true).Render(footer)
 	}
