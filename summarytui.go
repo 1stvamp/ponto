@@ -165,6 +165,25 @@ func (m summaryTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.startAnim()
 		case tea.MouseButtonLeft:
 			if msg.Action == tea.MouseActionPress {
+				in := func(id string) bool {
+					z := zone.Get(id)
+					return z != nil && z.InBounds(msg)
+				}
+				switch {
+				case in("foot-q"):
+					return m, tea.Quit
+				case in("foot-?"):
+					m.help.ShowAll = !m.help.ShowAll
+					m.layout()
+					m.rebuild()
+					return m, nil
+				case in("foot-e"):
+					m.toggleAll()
+					return m, m.startAnim()
+				case in("foot-enter"):
+					m.toggleCurrent()
+					return m, m.startAnim()
+				}
 				if sel := m.zoneHit(msg); sel >= 0 {
 					m.cursor = sel
 					addr := m.flatRes[sel].address
@@ -287,7 +306,7 @@ func (m *summaryTUIModel) layout() {
 	}
 	header := m.headerView()
 	m.headerHeight = lipgloss.Height(header)
-	footerHeight := lipgloss.Height(m.help.View(summaryKeys))
+	footerHeight := lipgloss.Height(m.footerView())
 	bodyHeight := m.height - m.headerHeight - footerHeight
 	if bodyHeight < 1 {
 		bodyHeight = 1
@@ -464,17 +483,25 @@ func (m summaryTUIModel) View() string {
 	if !m.ready {
 		return "loading…"
 	}
-	footer := m.help.View(summaryKeys)
-	if !m.focused {
-		footer = lipgloss.NewStyle().Faint(true).Render(footer)
-	}
 	out := lipgloss.JoinVertical(lipgloss.Left,
 		m.headerView(),
 		m.vp.View(),
-		footer,
+		m.footerView(),
 	)
 	// resolve the mouse zones marked during rebuild
 	return zone.Scan(out)
+}
+
+// footerView renders the clickable key hints (short, or expanded on ?).
+func (m summaryTUIModel) footerView() string {
+	footer := footerItems(summaryKeys.ShortHelp())
+	if m.help.ShowAll {
+		footer = footerFull(summaryKeys.FullHelp())
+	}
+	if !m.focused {
+		footer = lipgloss.NewStyle().Faint(true).Render(footer)
+	}
+	return footer
 }
 
 // padTo pads a (possibly styled) line with spaces to a visible width.

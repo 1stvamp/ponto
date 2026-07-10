@@ -383,8 +383,40 @@ func (m *tuiModel) rowAt(msg tea.MouseMsg) int {
 	return -1
 }
 
-// handleClick routes a left click to a filter chip, a toggle, or a list row.
+// handleClick routes a left click to a footer hint, a filter chip, a toggle,
+// or a list row.
 func (m *tuiModel) handleClick(msg tea.MouseMsg) tea.Cmd {
+	in := func(id string) bool {
+		z := zone.Get(id)
+		return z != nil && z.InBounds(msg)
+	}
+	switch {
+	case in("foot-q"):
+		return tea.Quit
+	case in("foot-?"):
+		m.help.ShowAll = !m.help.ShowAll
+		m.layout()
+		return nil
+	case in("foot-a"):
+		m.showAll = !m.showAll
+		m.refreshItems()
+		m.syncDetail()
+		return nil
+	case in("foot-t"):
+		m.tree = !m.tree
+		m.refreshItems()
+		m.syncDetail()
+		return nil
+	case in("foot-f"):
+		m.actionFilter = nextActionFilter(m.actionFilter)
+		m.refreshItems()
+		m.syncDetail()
+		return nil
+	case in("foot-/"):
+		var cmd tea.Cmd
+		m.list, cmd = m.list.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+		return cmd
+	}
 	for _, k := range []string{"all", "create", "update", "delete", "replace"} {
 		if z := zone.Get("gfilter-" + k); z != nil && z.InBounds(msg) {
 			m.actionFilter = k
@@ -840,7 +872,7 @@ func (m *tuiModel) layout() {
 	}
 	helpHeight := 1
 	if m.help.ShowAll {
-		helpHeight = 3
+		helpHeight = len(keys.FullHelp())
 	}
 	headerHeight := 2 // header line + action-filter bar
 	// account for pane borders (2) + header + help
@@ -859,6 +891,29 @@ func (m *tuiModel) layout() {
 	m.list.SetSize(leftWidth, bodyHeight)
 	m.detail.Width = rightWidth
 	m.detail.Height = bodyHeight
+}
+
+// footerItems renders key hints as clickable mouse zones (id "foot-<key>").
+func footerItems(bindings []key.Binding) string {
+	var parts []string
+	for _, b := range bindings {
+		if !b.Enabled() {
+			continue
+		}
+		h := b.Help()
+		item := dimStyle.Render(h.Key) + " " + dimStyle.Render(h.Desc)
+		parts = append(parts, zone.Mark("foot-"+h.Key, item))
+	}
+	return strings.Join(parts, dimStyle.Render(" · "))
+}
+
+// footerFull renders grouped key hints across lines (expanded help).
+func footerFull(groups [][]key.Binding) string {
+	var lines []string
+	for _, g := range groups {
+		lines = append(lines, footerItems(g))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m tuiModel) explorerView() string {
@@ -885,7 +940,10 @@ func (m tuiModel) explorerView() string {
 	left := paneStyle.Render(m.list.View())
 	right := paneStyle.Render(m.detail.View())
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
-	footer := m.help.View(keys)
+	footer := footerItems(keys.ShortHelp())
+	if m.help.ShowAll {
+		footer = footerFull(keys.FullHelp())
+	}
 	if !m.focused {
 		footer = lipgloss.NewStyle().Faint(true).Render(footer)
 	}
