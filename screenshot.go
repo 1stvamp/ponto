@@ -62,9 +62,17 @@ func screenshot(fileURL, format, fileName string) {
 			WithEventsEnabled(true),
 
 		chromedp.Navigate(fileURL),
-		// wait for graph to be visible
-		chromedp.WaitVisible(`#cytoscape-div`),
-		// find and click the export button ("Save Graph" for SVG, "Save PNG" for PNG)
+		// Wait for the graph container to mount, then let the klay layout settle
+		// before exporting so the SVG/PNG captures the laid-out graph, not an empty
+		// one. Use WaitReady, not WaitVisible: the cytoscape container renders its
+		// graph on absolutely-positioned canvases and reports no box model of its
+		// own to a GPU-less headless Chrome, so WaitVisible never returns.
+		chromedp.WaitReady(`#cytoscape-div`),
+		chromedp.Sleep(2 * time.Second),
+		// the export buttons live in a dropdown, so open it first, then click the
+		// target (#saveGraph for SVG, #savePng for PNG).
+		chromedp.Click(`#exportToggle`, chromedp.NodeVisible),
+		chromedp.WaitVisible(clickSelector),
 		chromedp.Click(clickSelector, chromedp.NodeVisible),
 	}); err != nil && !strings.Contains(err.Error(), "net::ERR_ABORTED") {
 		// Note: Ignoring the net::ERR_ABORTED page error is essential here since downloads
