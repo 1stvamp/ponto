@@ -25,7 +25,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-const VERSION = "0.3.3"
+// version is the build version; goreleaser overrides it via -ldflags at
+// release time (see .goreleaser.yml), so the tag drives the reported version.
+var version = "1.0.0"
 
 var TRUE = true
 
@@ -177,7 +179,7 @@ func newRootCmd() *cobra.Command {
 		Short: "Ponto is an interactive Terraform plan and state visualizer",
 		Long: "Ponto renders a Terraform plan or state as an interactive graph.\n" +
 			"By default it serves a web UI; it can also emit a standalone bundle or a static image.",
-		Version:       VERSION,
+		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: false,
 		Args:          cobra.NoArgs,
