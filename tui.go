@@ -16,6 +16,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	tfjson "github.com/hashicorp/terraform-json"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 // runTUI drives the interactive terminal UI: a launch screen, a spinner while
@@ -28,8 +29,14 @@ func runTUI(r *ponto) error {
 	log.SetOutput(io.Discard)
 	r.Verbose = false
 
+	zone.NewGlobal()
+	defer zone.Close()
 	m := newTUIModel(r)
-	_, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
+	_, err := tea.NewProgram(m,
+		tea.WithAltScreen(),
+		tea.WithMouseAllMotion(),
+		tea.WithReportFocus(),
+	).Run()
 	return err
 }
 
@@ -88,13 +95,14 @@ var keys = tuiKeyMap{
 
 var (
 	titleStyle   = lipgloss.NewStyle().Bold(true)
-	dimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
-	selStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15")).Background(lipgloss.Color("236"))
+	dimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#6E7480"))
+	selStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#E8E9EC")).Background(lipgloss.Color("#212327"))
+	hoverStyle   = lipgloss.NewStyle().Background(lipgloss.Color("#1A1B1F"))
 	headerStyle  = lipgloss.NewStyle().Padding(0, 1)
-	paneStyle    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
-	listTitle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("231")).Background(lipgloss.Color("#7655FD")).Padding(0, 1)
-	sectionStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("252"))
-	connectStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	paneStyle    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#3B3E45")).Padding(0, 1)
+	listTitle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#E8E9EC")).Background(lipgloss.Color("#7655FD")).Padding(0, 1)
+	sectionStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#B5B8C0"))
+	connectStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#3B3E45"))
 )
 
 // action glyphs, shared with the web legend.
@@ -116,8 +124,9 @@ func actionGlyph(change string) string {
 // action -> colour + glyph, matching the web legend. cbSafe swaps to the
 // Okabe-Ito colour-blind-safe palette.
 func actionStyleCB(change string, cbSafe bool) (string, lipgloss.Style) {
-	normal := map[string]string{"create": "42", "update": "39", "delete": "196", "replace": "214"}
-	cb := map[string]string{"create": "36", "update": "74", "delete": "173", "replace": "179"}
+	// truecolor hex, matching the web UI palette
+	normal := map[string]string{"create": "#4EE88E", "update": "#60A5FA", "delete": "#FB5C78", "replace": "#FBBF24"}
+	cb := map[string]string{"create": "#2CA089", "update": "#5AA9E6", "delete": "#E06D2E", "replace": "#E8A33D"}
 	pal := normal
 	if cbSafe {
 		pal = cb
@@ -153,7 +162,10 @@ type resItem struct {
 
 func (i resItem) FilterValue() string { return i.id }
 
-type resDelegate struct{ cbSafe bool }
+type resDelegate struct {
+	cbSafe bool
+	hover  int // list index under the mouse, or -1
+}
 
 func (d resDelegate) Height() int                             { return 1 }
 func (d resDelegate) Spacing() int                            { return 0 }
@@ -177,15 +189,22 @@ func (d resDelegate) Render(w io.Writer, m list.Model, index int, item list.Item
 		}
 		line = fmt.Sprintf("%s%s %s", arrow, glyph, it.label)
 	}
-	if sel {
-		// Fill the row so the selection background spans the pane width.
-		if pw := m.Width(); pw > lipgloss.Width(line) {
-			line += strings.Repeat(" ", pw-lipgloss.Width(line))
+	pad := func(s string) string {
+		if pw := m.Width(); pw > lipgloss.Width(s) {
+			return s + strings.Repeat(" ", pw-lipgloss.Width(s))
 		}
-		fmt.Fprint(w, selStyle.Render(line))
-	} else {
-		fmt.Fprint(w, style.Render(line))
+		return s
 	}
+	switch {
+	case sel:
+		line = selStyle.Render(pad(line))
+	case index == d.hover:
+		line = hoverStyle.Render(pad(line))
+	default:
+		line = style.Render(line)
+	}
+	// mark the row so mouse clicks/hover hit-test to this list index
+	fmt.Fprint(w, zone.Mark("gres-"+strconv.Itoa(index), line))
 }
 
 // --- model ----------------------------------------------------------------
@@ -207,6 +226,9 @@ type tuiModel struct {
 	tree         bool   // dependency-forest list vs flat list
 	actionFilter string // "all" or a specific change action
 	cbSafe       bool   // colour-blind-safe palette
+	hoverIndex   int    // list row under the mouse, or -1
+	focused      bool
+	helpOpen     bool // help pop-up shown
 
 	// derived from the graph, once assets are ready
 	resources    []resItem              // every resource, sorted
@@ -229,6 +251,8 @@ func newTUIModel(r *ponto) tuiModel {
 		help:         help.New(),
 		tree:         true,
 		actionFilter: "all",
+		hoverIndex:   -1,
+		focused:      true,
 	}
 }
 
@@ -244,6 +268,16 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// While the help pop-up is open, keys only close it or quit.
+		if m.state == stateExplorer && m.helpOpen {
+			switch msg.String() {
+			case "?", "esc":
+				m.helpOpen = false
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			}
+			return m, nil
+		}
 		// While filtering, let the list consume keys (except it handles esc/enter itself).
 		if m.state == stateExplorer && m.list.FilterState() == list.Filtering {
 			var cmd tea.Cmd
@@ -260,8 +294,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case m.state == stateError:
 			return m, nil // any non-quit key ignored
 		case m.state == stateExplorer && key.Matches(msg, keys.Help):
-			m.help.ShowAll = !m.help.ShowAll
-			m.layout()
+			m.helpOpen = true
 			return m, nil
 		case m.state == stateExplorer && key.Matches(msg, keys.All):
 			m.showAll = !m.showAll
@@ -277,6 +310,40 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tree = !m.tree
 			m.refreshItems()
 			m.syncDetail()
+			return m, nil
+		}
+
+	case tea.FocusMsg:
+		m.focused = true
+		return m, nil
+	case tea.BlurMsg:
+		m.focused = false
+		return m, nil
+
+	case tea.MouseMsg:
+		if m.state != stateExplorer {
+			return m, nil
+		}
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			m.list.CursorUp()
+			m.syncDetail()
+			return m, nil
+		case tea.MouseButtonWheelDown:
+			m.list.CursorDown()
+			m.syncDetail()
+			return m, nil
+		case tea.MouseButtonLeft:
+			if msg.Action == tea.MouseActionPress {
+				return m, m.handleClick(msg)
+			}
+			return m, nil
+		case tea.MouseButtonNone:
+			h := m.rowAt(msg)
+			if h != m.hoverIndex {
+				m.hoverIndex = h
+				m.list.SetDelegate(resDelegate{cbSafe: m.cbSafe, hover: h})
+			}
 			return m, nil
 		}
 
@@ -314,6 +381,76 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 	}
 	return m, nil
+}
+
+// rowAt returns the list index whose row is under the mouse, or -1.
+func (m *tuiModel) rowAt(msg tea.MouseMsg) int {
+	for i := range m.list.Items() {
+		if z := zone.Get("gres-" + strconv.Itoa(i)); z != nil && z.InBounds(msg) {
+			return i
+		}
+	}
+	return -1
+}
+
+// handleClick routes a left click to a footer hint, a filter chip, a toggle,
+// or a list row.
+func (m *tuiModel) handleClick(msg tea.MouseMsg) tea.Cmd {
+	in := func(id string) bool {
+		z := zone.Get(id)
+		return z != nil && z.InBounds(msg)
+	}
+	switch {
+	case in("foot-q"):
+		return tea.Quit
+	case in("foot-?"):
+		m.helpOpen = true
+		return nil
+	case in("foot-a"):
+		m.showAll = !m.showAll
+		m.refreshItems()
+		m.syncDetail()
+		return nil
+	case in("foot-t"):
+		m.tree = !m.tree
+		m.refreshItems()
+		m.syncDetail()
+		return nil
+	case in("foot-f"):
+		m.actionFilter = nextActionFilter(m.actionFilter)
+		m.refreshItems()
+		m.syncDetail()
+		return nil
+	case in("foot-/"):
+		var cmd tea.Cmd
+		m.list, cmd = m.list.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+		return cmd
+	}
+	for _, k := range []string{"all", "create", "update", "delete", "replace"} {
+		if z := zone.Get("gfilter-" + k); z != nil && z.InBounds(msg) {
+			m.actionFilter = k
+			m.refreshItems()
+			m.syncDetail()
+			return nil
+		}
+	}
+	if z := zone.Get("gtoggle-all"); z != nil && z.InBounds(msg) {
+		m.showAll = !m.showAll
+		m.refreshItems()
+		m.syncDetail()
+		return nil
+	}
+	if z := zone.Get("gtoggle-tree"); z != nil && z.InBounds(msg) {
+		m.tree = !m.tree
+		m.refreshItems()
+		m.syncDetail()
+		return nil
+	}
+	if i := m.rowAt(msg); i >= 0 {
+		m.list.Select(i)
+		m.syncDetail()
+	}
+	return nil
 }
 
 func (m tuiModel) View() string {
@@ -363,7 +500,7 @@ func (m tuiModel) planSource() string {
 // --- explorer -------------------------------------------------------------
 
 func (m *tuiModel) initExplorer() {
-	l := list.New(nil, resDelegate{cbSafe: m.cbSafe}, 0, 0)
+	l := list.New(nil, resDelegate{cbSafe: m.cbSafe, hover: -1}, 0, 0)
 	l.Title = "Resources"
 	// Pre-render the title ourselves, so keep the list's own title style a passthrough.
 	l.Styles.Title = lipgloss.NewStyle()
@@ -743,9 +880,6 @@ func (m *tuiModel) layout() {
 		return
 	}
 	helpHeight := 1
-	if m.help.ShowAll {
-		helpHeight = 3
-	}
 	headerHeight := 2 // header line + action-filter bar
 	// account for pane borders (2) + header + help
 	bodyHeight := m.height - headerHeight - helpHeight - 2
@@ -765,9 +899,105 @@ func (m *tuiModel) layout() {
 	m.detail.Height = bodyHeight
 }
 
+// footerItems renders key hints as clickable mouse zones (id "foot-<key>").
+func footerItems(bindings []key.Binding) string {
+	var parts []string
+	for _, b := range bindings {
+		if !b.Enabled() {
+			continue
+		}
+		h := b.Help()
+		item := dimStyle.Render(h.Key) + " " + dimStyle.Render(h.Desc)
+		parts = append(parts, zone.Mark("foot-"+h.Key, item))
+	}
+	return strings.Join(parts, dimStyle.Render(" · "))
+}
+
+// helpRow is one line in the help modal: a key hint and its description. An
+// empty key with a description is a section header; both empty is a spacer.
+type helpRow struct{ key, desc string }
+
+var explorerHelpRows = []helpRow{
+	{"", "Navigation"},
+	{"↑/↓, j/k", "move selection"},
+	{"wheel", "scroll the list"},
+	{"", ""},
+	{"", "Actions"},
+	{"/", "search resources"},
+	{"f", "filter by change action"},
+	{"t", "toggle tree / flat list"},
+	{"a", "toggle changed / all"},
+	{"", ""},
+	{"", "Mouse"},
+	{"click", "select a row, filter chip or footer item"},
+	{"hover", "highlight a row"},
+	{"", ""},
+	{"", "General"},
+	{"?", "toggle this help"},
+	{"q", "quit"},
+}
+
+var summaryHelpRows = []helpRow{
+	{"", "Navigation"},
+	{"↑/↓, j/k", "move between resources"},
+	{"wheel", "scroll"},
+	{"", ""},
+	{"", "Actions"},
+	{"enter, space", "expand / collapse the selected resource"},
+	{"e", "expand / collapse all"},
+	{"", ""},
+	{"", "Mouse"},
+	{"click", "select/expand a row, or run a footer item"},
+	{"hover", "highlight a row"},
+	{"", ""},
+	{"", "General"},
+	{"?", "toggle this help"},
+	{"q", "quit"},
+}
+
+// helpModal renders a centered help pop-up over a width×height screen.
+func helpModal(width, height int, title string, rows []helpRow) string {
+	keyStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#A8FF53"))
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#B5B8C0"))
+	headStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#878C99"))
+	ttlStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#E8E9EC"))
+
+	maxKey := 0
+	for _, r := range rows {
+		if r.key != "" && lipgloss.Width(r.key) > maxKey {
+			maxKey = lipgloss.Width(r.key)
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString(ttlStyle.Render(title) + "\n\n")
+	for _, r := range rows {
+		switch {
+		case r.key == "" && r.desc == "":
+			b.WriteString("\n")
+		case r.key == "":
+			b.WriteString(headStyle.Render(r.desc) + "\n")
+		default:
+			pad := strings.Repeat(" ", maxKey-lipgloss.Width(r.key))
+			b.WriteString("  " + keyStyle.Render(r.key) + pad + "   " + descStyle.Render(r.desc) + "\n")
+		}
+	}
+	b.WriteString("\n" + dimStyle.Render("press ? or esc to close"))
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#7655FD")).
+		Padding(1, 3).
+		Render(strings.TrimRight(b.String(), "\n"))
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
+}
+
 func (m tuiModel) explorerView() string {
 	if !m.ready {
 		return "loading…"
+	}
+	if m.helpOpen {
+		return helpModal(m.width, m.height, "Ponto — Plan Explorer", explorerHelpRows)
 	}
 	// header: Ponto + summary on the left, view mode on the right
 	filter := "changed + connected"
@@ -789,8 +1019,12 @@ func (m tuiModel) explorerView() string {
 	left := paneStyle.Render(m.list.View())
 	right := paneStyle.Render(m.detail.View())
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
-	footer := m.help.View(keys)
-	return lipgloss.JoinVertical(lipgloss.Left, header, filterBar, body, footer)
+	footer := footerItems(keys.ShortHelp())
+	if !m.focused {
+		footer = lipgloss.NewStyle().Faint(true).Render(footer)
+	}
+	// zone.Scan resolves the mouse zones marked in the filter bar and list rows
+	return zone.Scan(lipgloss.JoinVertical(lipgloss.Left, header, filterBar, body, footer))
 }
 
 // filterBar renders the action-filter segments: filter: [all] + create ~ update ...
@@ -819,7 +1053,7 @@ func (m tuiModel) filterBar() string {
 		default:
 			style = dimStyle
 		}
-		parts = append(parts, style.Render(text))
+		parts = append(parts, zone.Mark("gfilter-"+s.key, style.Render(text)))
 	}
 	return strings.Join(parts, " ")
 }
