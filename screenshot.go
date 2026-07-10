@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,17 +14,26 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
+// fileURL turns an absolute filesystem path into a file:// URL that works on
+// all platforms. On Windows filepath.ToSlash turns C:\a\b into C:/a/b, and the
+// leading slash makes it file:///C:/a/b; on unix /a/b already starts with a
+// slash, giving file:///a/b.
+func fileURL(p string) string {
+	p = filepath.ToSlash(p)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return "file://" + p
+}
+
 // Heavily inspired by: https://github.com/chromedp/examples/blob/master/download_file/main.go
-func screenshot(s *http.Server, format string, fileName string) {
-	// ctx, cancel := chromedp.NewContext(context.Background(), chromedp.WithDebugf(log.Printf))
+func screenshot(fileURL, format, fileName string) {
 	ctx, cancel := chromedp.NewContext(context.Background())
 	defer cancel()
 
 	// create a timeout as a safety net to prevent any infinite wait loops
 	ctx, cancel = context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-
-	url := fmt.Sprintf("http://%s", s.Addr)
 
 	// Which export button to drive, and the resulting file extension.
 	clickSelector := "#saveGraph"
@@ -52,7 +61,7 @@ func screenshot(s *http.Server, format string, fileName string) {
 			WithDownloadPath(os.TempDir()).
 			WithEventsEnabled(true),
 
-		chromedp.Navigate(url),
+		chromedp.Navigate(fileURL),
 		// wait for graph to be visible
 		chromedp.WaitVisible(`#cytoscape-div`),
 		// find and click the export button ("Save Graph" for SVG, "Save PNG" for PNG)
@@ -77,9 +86,6 @@ func screenshot(s *http.Server, format string, fileName string) {
 	}
 
 	log.Printf("Image generation complete: %s", dest)
-
-	// Shutdown http server
-	s.Shutdown(context.Background())
 }
 
 // This function resolves the "invalid cross-device link" error for moving files

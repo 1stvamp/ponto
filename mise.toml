@@ -95,8 +95,8 @@ run = "go run . --tui --working-dir example/random-test"
 
 [tasks."run:image-example"]
 description = "Render the bundled random-test example to a static image (build/ponto-example.svg)"
-# Needs the web UI: gen-image drives the served graph in headless chromium to
-# export it, so a chrome/chromium binary must be on PATH (not a mise tool).
+# Needs the web UI: gen-image renders the generated static HTML in headless
+# chromium over file://, so a chrome/chromium binary must be on PATH (not a mise tool).
 depends = ["build:ui"]
 run = "mkdir -p build && go run . --gen-image --working-dir example/random-test --output build/ponto-example"
 
@@ -111,4 +111,4 @@ run = "go run . summary --format tui --working-dir example/random-test"
 
 [tasks."run:docker"]
 description = "Run the standard Docker image against the current directory"
-run = 'docker run --rm -it -p 7668:7668 -v "$PWD:/src" ghcr.io/1stvamp/ponto'
+run = 'docker run --rm -v "$PWD:/src" ghcr.io/1stvamp/ponto'

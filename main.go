@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/fs"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,7 +26,7 @@ import (
 
 // version is the build version; goreleaser overrides it via -ldflags at
 // release time (see .goreleaser.yml), so the tag drives the reported version.
-var version = "1.0.0"
+var version = "1.1.0"
 
 var TRUE = true
 
@@ -47,7 +46,6 @@ type ponto struct {
 	TFCOrgName       string
 	TFCWorkspaceName string
 	ShowSensitive    bool
-	GenImage         bool
 	ImageFormat      string
 	Output           string
 	Verbose          bool
@@ -145,9 +143,9 @@ func fileExists(p string) bool {
 
 func newRootCmd() *cobra.Command {
 	modeFlags := pflag.NewFlagSet("mode", pflag.ContinueOnError)
-	modeFlags.BoolP("standalone", "s", false, "Generate a standalone zip instead of serving")
-	modeFlags.BoolP("gen-image", "g", false, "Generate a graph image instead of serving")
-	modeFlags.BoolP("tui", "i", false, "Launch the interactive terminal UI instead of serving (alias: --interactive)")
+	modeFlags.BoolP("standalone", "s", false, "Deprecated: static HTML output is now the default")
+	modeFlags.BoolP("gen-image", "g", false, "Generate a graph image (svg/png)")
+	modeFlags.BoolP("tui", "i", false, "Launch the interactive terminal UI (alias: --interactive)")
 
 	inputFlags := pflag.NewFlagSet("input", pflag.ContinueOnError)
 	inputFlags.StringP("working-dir", "C", ".", "Path to the Terraform configuration")
@@ -163,8 +161,8 @@ func newRootCmd() *cobra.Command {
 	inputFlags.Bool("tfc-new-run", false, "Create a new Terraform Cloud run")
 
 	outputFlags := pflag.NewFlagSet("output", pflag.ContinueOnError)
-	outputFlags.StringP("address", "a", "0.0.0.0:7668", "Host:port for the Ponto server")
 	outputFlags.StringP("output", "o", "ponto", "Base name for generated files (.zip/.svg/.png)")
+	outputFlags.Bool("open", false, "Open the generated HTML in your browser")
 	outputFlags.String("image-format", "svg", "Image format for --gen-image: svg or png")
 	outputFlags.String("name", "ponto", "Configuration name")
 	outputFlags.Bool("show-sensitive", false, "Display sensitive values")
@@ -178,7 +176,8 @@ func newRootCmd() *cobra.Command {
 		Use:   "ponto",
 		Short: "Ponto is an interactive Terraform plan and state visualizer",
 		Long: "Ponto renders a Terraform plan or state as an interactive graph.\n" +
-			"By default it serves a web UI; it can also emit a standalone bundle or a static image.",
+			"By default it writes a single self-contained HTML file; it can also emit\n" +
+			"a static image or an interactive terminal UI.",
 		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: false,
@@ -213,9 +212,9 @@ func newRootCmd() *cobra.Command {
 	cmd.SetUsageFunc(func(c *cobra.Command) error {
 		out := c.OutOrStderr()
 		fmt.Fprintf(out, "Usage:\n  %s [flags]\n\n", c.CommandPath())
-		fmt.Fprintf(out, "Modes (default: serve the web UI):\n%s\n", modeFlags.FlagUsages())
+		fmt.Fprintf(out, "Modes (default: write a self-contained HTML file):\n%s\n", modeFlags.FlagUsages())
 		fmt.Fprintf(out, "Input:\n%s\n", inputFlags.FlagUsages())
-		fmt.Fprintf(out, "Output and server:\n%s\n", outputFlags.FlagUsages())
+		fmt.Fprintf(out, "Output:\n%s\n", outputFlags.FlagUsages())
 		fmt.Fprintf(out, "Other:\n%s", metaFlags.FlagUsages())
 		fmt.Fprintf(out, "  -h, --help      Show this help\n")
 		fmt.Fprintf(out, "      --version   Print the version\n")
@@ -347,7 +346,6 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	if err != nil {
 		return err
 	}
-	r.GenImage = genImage
 	r.ImageFormat = imageFormat
 
 	// The TUI drives its own asset generation so it can show a spinner.
@@ -364,24 +362,37 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	if err != nil {
 		return err
 	}
-	frontendFS := http.FileServer(http.FS(fe))
 
-	if v.GetBool("standalone") {
-		zipName := fmt.Sprintf("%s.zip", r.Output)
-		if err := r.generateZip(fe, zipName); err != nil {
+	// --gen-image: render the static HTML in a headless browser over file://
+	// and drive its export button, then clean up the temp file.
+	if genImage {
+		tmp, err := os.CreateTemp("", "ponto-*.html")
+		if err != nil {
 			return err
 		}
-		log.Printf("Generated zip file: %s\n", zipName)
+		tmpName := tmp.Name()
+		tmp.Close()
+		defer os.Remove(tmpName)
+
+		if err := r.generateStaticHTML(fe, tmpName); err != nil {
+			return err
+		}
+		screenshot(fileURL(tmpName), r.ImageFormat, r.Output)
 		return nil
 	}
 
-	if err := r.startServer(v.GetString("address"), frontendFS); err != nil {
-		// http.Serve() returns an error on shutdown; for gen-image that's expected.
-		if genImage {
-			log.Println("Server shut down.")
-			return nil
-		}
-		return fmt.Errorf("could not start server: %w", err)
+	if v.GetBool("standalone") {
+		log.Println("warning: --standalone is deprecated; static HTML output is now the default")
+	}
+
+	htmlName := fmt.Sprintf("%s.html", r.Output)
+	if err := r.generateStaticHTML(fe, htmlName); err != nil {
+		return err
+	}
+	log.Printf("Wrote %s", htmlName)
+
+	if v.GetBool("open") {
+		return openInBrowser(htmlName)
 	}
 	return nil
 }
@@ -671,8 +682,4 @@ func saveJSONToFile(prefix string, fileType string, path string, j interface{}) 
 	}
 
 	return fmt.Sprintf("%s/%s-%s.json", newpath, prefix, fileType)
-}
-
-func enableCors(w *http.ResponseWriter) {
-	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 }

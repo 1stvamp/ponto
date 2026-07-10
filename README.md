@@ -1,6 +1,6 @@
-# Ponto - Terraform Visualizer
+# Ponto - Terraform Visualiser
 
-Ponto is a [Terraform](http://terraform.io/) visualizer. It is a fork of the
+Ponto is a [Terraform](http://terraform.io/) visualiser. It is a fork of the
 excellent but abandoned [Rover](https://github.com/im2nguyen/rover) by Nguyen
 Nguyen and contributors, released under the MIT license (see `LICENSE`).
 
@@ -8,7 +8,7 @@ In order to do this, Ponto:
 
 1. generates a [`plan`](https://www.terraform.io/docs/cli/commands/plan.html#out-filename) file and parses the configuration in the root directory or uses a provided plan.
 1. parses the `plan` and configuration files to generate three items: the resource overview (`rso`), the resource map (`map`), and the resource graph (`graph`).
-1. consumes the `rso`, `map`, and `graph` to generate an interactive configuration and state visualization hosts on `0.0.0.0:7668`.
+1. consumes the `rso`, `map`, and `graph` to generate an interactive configuration and state visualisation as a self-contained HTML file.
 
 ![Ponto Screenshot](docs/ponto-screenshot.png)
 
@@ -16,28 +16,27 @@ In order to do this, Ponto:
 
 The fastest way to get up and running with Ponto is through Docker.
 
-Run the following command in any Terraform workspace to generate a visualization. This command copies all the files in your current directory to the Ponto container and exposes port `:7668`.
+Run the following in any Terraform workspace to generate a visualisation. This
+mounts your current directory into the container and writes a single
+self-contained `ponto.html` back into it:
 
 ```
-$ docker run --rm -it -p 7668:7668 -v $(pwd):/src ghcr.io/1stvamp/ponto
+$ docker run --rm -v $(pwd):/src ghcr.io/1stvamp/ponto
 2021/07/02 06:46:23 Starting Ponto...
-2021/07/02 06:46:23 Initializing Terraform...
-2021/07/02 06:46:24 Generating plan...
-2021/07/02 06:46:25 Parsing configuration...
-2021/07/02 06:46:25 Generating resource overview...
-2021/07/02 06:46:25 Generating resource map...
-2021/07/02 06:46:25 Generating resource graph...
 2021/07/02 06:46:25 Done generating assets.
-2021/07/02 06:46:25 Ponto is running on 0.0.0.0:7668
+2021/07/02 06:46:25 Wrote ponto.html
 ```
 
-Or run it natively in a Terraform workspace, with `ponto` on your `PATH` (see [Installation](#installation)) and `terraform` or `tofu` available:
+Open the resulting `ponto.html` in any browser. It is fully self-contained, so
+you can also attach it to a PR or email it.
+
+Or run it natively in a Terraform workspace, with `ponto` on your `PATH` (see
+[Installation](#installation)) and `terraform` or `tofu` available:
 
 ```shell
-$ ponto
+$ ponto            # writes ./ponto.html
+$ ponto --open     # writes ./ponto.html and opens it in your browser
 ```
-
-Once Ponto runs on `0.0.0.0:7668`, navigate to it to find the visualization!
 
 ### Run on Terraform plan file
 
@@ -53,7 +52,7 @@ $ terraform show -json plan.out > plan.json
 Then, run Ponto on it.
 
 ```
-$ docker run --rm -it -p 7668:7668 -v $(pwd)/plan.json:/src/plan.json ghcr.io/1stvamp/ponto:latest --plan-json-path=plan.json
+$ docker run --rm -v $(pwd)/plan.json:/src/plan.json ghcr.io/1stvamp/ponto:latest --plan-json-path=plan.json
 ```
 
 Or natively:
@@ -64,10 +63,12 @@ $ ponto --plan-json-path plan.json
 
 ### Standalone mode
 
-Standalone mode generates a `ponto.zip` file containing all the static assets.
+`--standalone` is deprecated: self-contained HTML is now the default, so it just
+writes `ponto.html` (the same as running `ponto` with no flags) and prints a
+deprecation warning.
 
 ```
-$ docker run --rm -it -p 7668:7668 -v "$(pwd):/src" ghcr.io/1stvamp/ponto --standalone
+$ docker run --rm -v "$(pwd):/src" ghcr.io/1stvamp/ponto --standalone
 ```
 
 Or natively:
@@ -75,8 +76,6 @@ Or natively:
 ```shell
 $ ponto --standalone
 ```
-
-After all the assets are generated, unzip `ponto.zip` and open `ponto/index.html` in your favourite web browser.
 
 ### Set environment variables
 
@@ -89,7 +88,7 @@ $ printenv | grep "AWS" > .env
 Then, add it as environment variables to your Docker container with `--env-file`.
 
 ```
-$ docker run --rm -it -p 7668:7668 -v "$(pwd):/src" --env-file ./.env ghcr.io/1stvamp/ponto
+$ docker run --rm -v "$(pwd):/src" --env-file ./.env ghcr.io/1stvamp/ponto
 ```
 
 Running natively there's nothing extra to do: Ponto inherits your shell environment, so exported credentials are already available.
@@ -103,7 +102,7 @@ $ ponto
 Use `--tf-backend-config` to define backend config files and `--tf-vars-file` or `--tf-var` to define variables. For example, you can run the following in the `example/random-test` directory to overload variables.
 
 ```
-$ docker run --rm -it -p 7668:7668 -v "$(pwd):/src" ghcr.io/1stvamp/ponto --tf-backend-config test.tfbackend --tf-vars-file test.tfvars --tf-var max_length=4
+$ docker run --rm -v "$(pwd):/src" ghcr.io/1stvamp/ponto --tf-backend-config test.tfbackend --tf-vars-file test.tfvars --tf-var max_length=4
 ```
 
 Or natively, from the `example/random-test` directory:
@@ -114,7 +113,7 @@ $ ponto --tf-backend-config test.tfbackend --tf-vars-file test.tfvars --tf-var m
 
 ### Image generation
 
-Use `--gen-image` to generate and save the visualization as a SVG image.
+Use `--gen-image` to generate and save the visualisation as a SVG image.
 
 ```
 $ docker run --rm -it  -v "$(pwd):/src" ghcr.io/1stvamp/ponto --gen-image
@@ -261,7 +260,7 @@ The tasks cover both the native and Docker workflows:
 - `mise run build:docker` / `mise run build:docker-slim`: build the standard or slim Docker image.
 - `mise run test`: vet, format-check and compile the Go code.
 - `mise run fmt`: format the Go code.
-- `mise run ponto`: run Ponto natively, serving the web UI.
+- `mise run ponto`: run Ponto natively, writing `ponto.html`.
 - `mise run run:example`: serve the bundled `random-test` example.
 - `mise run run:tui-example`: explore the bundled `random-test` example in the interactive TUI.
 - `mise run run:image-example`: render the bundled `random-test` example to a static image (`build/ponto-example.svg`; needs a chrome/chromium binary on PATH).
@@ -281,19 +280,13 @@ Navigate into `random-test` example configuration. This directory contains confi
 $ cd example/random-test
 ```
 
-Run Ponto. Ponto will start running in the current directory and assume the Terraform binary lives in `/bin/terraform` by default. Use `--tf-path` to point at a different location.
+Run Ponto. Ponto will generate a visualisation in the current directory and assume the Terraform binary lives in `/bin/terraform` by default. Use `--tf-path` to point at a different location.
 
 ```
 $ ponto
 2021/06/23 22:51:27 Starting Ponto...
-2021/06/23 22:51:27 Initializing Terraform...
-2021/06/23 22:51:28 Generating plan...
-2021/06/23 22:51:28 Parsing configuration...
-2021/06/23 22:51:28 Generating resource overview...
-2021/06/23 22:51:28 Generating resource map...
-2021/06/23 22:51:28 Generating resource graph...
 2021/06/23 22:51:28 Done generating assets.
-2021/06/23 22:51:28 Ponto is running on 0.0.0.0:7668
+2021/06/23 22:51:28 Wrote ponto.html
 ```
 
 You can specify the working directory (where your configuration is living) and the Terraform binary location using flags.
@@ -301,5 +294,3 @@ You can specify the working directory (where your configuration is living) and t
 ```
 $ ponto --working-dir "example/eks-cluster" --tf-path "/Users/dos/terraform"
 ```
-
-Once Ponto runs on `0.0.0.0:7668`, navigate to it to find the visualization!
