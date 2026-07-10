@@ -282,6 +282,7 @@ func newSummaryCmd() *cobra.Command {
 	sumFlags.String("format", "terminal", "Output format: terminal, markdown, image or tui")
 	sumFlags.String("emoji", "dots", "Emoji encoding: dots, signs or none")
 	sumFlags.StringP("output", "o", "ponto-summary", "Base name for the image card PNG (--format image)")
+	sumFlags.String("image-format", "png", "Image format for --format image: png or svg")
 	sumFlags.BoolP("interactive", "i", false, "Explore the terminal summary interactively (alias: --format tui)")
 
 	v := viper.New()
@@ -300,7 +301,11 @@ func newSummaryCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			code, err := runSummary(&r, v.GetString("format"), v.GetString("emoji"), v.GetString("output"), v.GetBool("interactive"))
+			imageFormat := v.GetString("image-format")
+			if v.GetString("format") == "image" && imageFormat != "png" && imageFormat != "svg" {
+				return fmt.Errorf("invalid --image-format %q: must be \"png\" or \"svg\"", imageFormat)
+			}
+			code, err := runSummary(&r, v.GetString("format"), v.GetString("emoji"), v.GetString("output"), imageFormat, v.GetBool("interactive"))
 			if err != nil {
 				return err
 			}

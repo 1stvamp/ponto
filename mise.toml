@@ -109,6 +109,11 @@ run = "go run . summary --working-dir example/random-test"
 description = "Explore the safety-graded plan summary for the bundled random-test example interactively"
 run = "go run . summary --format tui --working-dir example/random-test"
 
+[tasks."run:summary-image-example"]
+description = "Render the safety-graded plan summary card to an image (build/ponto-summary-example.png)"
+# No build:ui dep and no chrome needed: the card renderer is browser-free.
+run = "mkdir -p build && go run . summary --format image --working-dir example/random-test --output build/ponto-summary-example"
+
 [tasks."run:docker"]
 description = "Run the standard Docker image against the current directory"
 run = 'docker run --rm -v "$PWD:/src" ghcr.io/1stvamp/ponto'
