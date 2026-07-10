@@ -29,10 +29,10 @@
         <span class="cb-icon">◑</span> CB-safe
       </button>
       <div class="export">
-        <button class="export-btn" @click="exportOpen = !exportOpen">Export ▾</button>
+        <button id="exportToggle" class="export-btn" @click="exportOpen = !exportOpen">Export ▾</button>
         <div v-if="exportOpen" class="export-menu" @mouseleave="exportOpen = false">
-          <button @click="pick('saveGraph')">Save graph as SVG</button>
-          <button @click="pick('savePng')">Save graph as PNG</button>
+          <button id="saveGraph" @click="pick('saveGraph')">Save graph as SVG</button>
+          <button id="savePng" @click="pick('savePng')">Save graph as PNG</button>
           <button @click="pick('copySummary')">Copy plan summary</button>
         </div>
       </div>
