@@ -139,8 +139,9 @@ func AddFileToZip(zipWriter *zip.Writer, fileType string, j interface{}) error {
 		return fmt.Errorf("error producing JSON: %s\n", err)
 	}
 
-	// add syntax to make json file a js object
-	content := fmt.Sprintf("const %s = %s", fileType, string(b))
+	// Expose the payload as a window global so the bundled UI (an ES module,
+	// which has its own scope) can read it in standalone mode.
+	content := fmt.Sprintf("window.%s = %s", fileType, string(b))
 
 	tempFileName, tempFile, err := createTempFile(filename, []byte(content))
 	defer os.Remove(tempFile.Name()) // clean up

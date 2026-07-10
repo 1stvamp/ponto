@@ -2,49 +2,27 @@
   "name": "ponto-ui",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "serve": "NODE_OPTIONS='--openssl-legacy-provider' vue-cli-service serve",
-    "build": "NODE_OPTIONS='--openssl-legacy-provider' vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "axios": "^0.21.1",
     "copy-to-clipboard": "^3.3.1",
-    "core-js": "^3.6.5",
     "cytoscape-klay": "^3.1.4",
     "cytoscape-node-html-label": "^1.2.2",
     "cytoscape-svg": "^0.3.1",
     "file-saver": "^2.0.5",
-    "vue": "^2.6.11",
+    "vue": "2.7.16",
     "vue-cytoscape": "^1.0.8",
     "vue-meta": "^2.4.0"
   },
   "devDependencies": {
-    "@vue/cli-plugin-babel": "~4.5.0",
-    "@vue/cli-plugin-eslint": "~4.5.0",
-    "@vue/cli-service": "~4.5.0",
-    "babel-eslint": "^10.1.0",
-    "eslint": "^6.7.2",
-    "eslint-plugin-vue": "^6.2.2",
-    "vue-template-compiler": "^2.6.11"
+    "@vitejs/plugin-vue2": "^2.3.3",
+    "vite": "^5.4.0",
+    "vite-plugin-singlefile": "^2.0.0"
   },
-  "eslintConfig": {
-    "root": true,
-    "env": {
-      "node": true
-    },
-    "extends": [
-      "plugin:vue/essential",
-      "eslint:recommended"
-    ],
-    "parserOptions": {
-      "parser": "babel-eslint"
-    },
-    "rules": {}
-  },
-  "browserslist": [
-    "> 1%",
-    "last 2 versions",
-    "not dead"
-  ]
+  "browserslist": ["> 1%", "last 2 versions", "not dead"]
 }

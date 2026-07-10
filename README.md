@@ -197,7 +197,7 @@ You can download the Ponto binary specific to your system from the [Releases pag
 
 ### Build from source
 
-You can build Ponto manually by cloning this repository, then building the frontend and compiling the binary. It requires Go v1.23+ and `npm`.
+You can build Ponto manually by cloning this repository, then building the frontend and compiling the binary. It requires Go v1.23+ and [bun](https://bun.sh) (no Node needed).
 
 #### Build frontend
 
@@ -210,13 +210,13 @@ $ cd ui
 Then, install the dependencies.
 
 ```
-$ npm install
+$ bun install
 ```
 
-Finally, build the frontend.
+Finally, build the frontend (`--bun` runs Vite under bun's runtime, so no Node is required).
 
 ```
-$ npm run build
+$ bun --bun vite build
 ```
 
 #### Compile binary
@@ -248,7 +248,7 @@ This produces `ghcr.io/1stvamp/ponto:latest`. There are two image variants:
 
 ## Development
 
-Ponto uses [mise](https://mise.jdx.dev/) to pin its toolchain (Go, Node, Terraform) and to wrap the common build, test and run tasks, so a local checkout matches the build. Set the tools up with:
+Ponto uses [mise](https://mise.jdx.dev/) to pin its toolchain (Go, bun, Terraform) and to wrap the common build, test and run tasks, so a local checkout matches the build. Set the tools up with:
 
 ```shell
 $ mise install
