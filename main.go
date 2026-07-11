@@ -33,6 +33,9 @@ var TRUE = true
 //go:embed ui/dist
 var frontend embed.FS
 
+//go:embed NOTICE
+var noticeText string
+
 type ponto struct {
 	Name             string
 	WorkingDir       string
@@ -195,6 +198,7 @@ func newRootCmd() *cobra.Command {
 	cmd.MarkFlagsMutuallyExclusive("standalone", "gen-image", "tui")
 
 	cmd.AddCommand(newSummaryCmd())
+	cmd.AddCommand(newLicensesCmd())
 
 	// Allow --interactive as an alias for --tui.
 	cmd.Flags().SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
@@ -262,6 +266,23 @@ func buildPonto(cmd *cobra.Command, v *viper.Viper) (ponto, error) {
 		TFCWorkspaceName: v.GetString("tfc-workspace"),
 		TFCNewRun:        v.GetBool("tfc-new-run"),
 	}, nil
+}
+
+// newLicensesCmd is the `ponto licenses` subcommand: it prints the embedded
+// NOTICE, the third-party attribution for the bundled dependencies (including
+// the FreeType-based font rasteriser used by the image export).
+func newLicensesCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:           "licenses",
+		Short:         "Print third-party licence attribution (the NOTICE file)",
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: false,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Fprint(cmd.OutOrStdout(), noticeText)
+			return nil
+		},
+	}
 }
 
 // newSummaryCmd is the `ponto summary` subcommand: a safety-graded plan digest.
