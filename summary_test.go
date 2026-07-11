@@ -130,8 +130,4 @@ func TestRenderersSmoke(t *testing.T) {
 			t.Errorf("markdown render missing %q", want)
 		}
 	}
-	card := renderSummaryCardHTML(m, "dots")
-	if !strings.Contains(card, "Terraform Plan") || !strings.Contains(card, "DOCTYPE") {
-		t.Error("card html missing structure")
-	}
 }

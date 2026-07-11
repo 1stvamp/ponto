@@ -982,7 +982,8 @@ func helpModal(width, height int, title string, rows []helpRow) string {
 			b.WriteString("  " + keyStyle.Render(r.key) + pad + "   " + descStyle.Render(r.desc) + "\n")
 		}
 	}
-	b.WriteString("\n" + dimStyle.Render("press ? or esc to close"))
+	b.WriteString("\n" + dimStyle.Render("image export uses tdewolff/canvas, based in part on the work of the FreeType Team"))
+	b.WriteString("\n" + dimStyle.Render("run 'ponto licenses' for full attribution · press ? or esc to close"))
 
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).

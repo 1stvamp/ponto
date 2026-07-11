@@ -1,8 +1,6 @@
 package main
 
 import (
-	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,10 +8,8 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/chromedp/chromedp"
 	tfjson "github.com/hashicorp/terraform-json"
 )
 
@@ -479,78 +475,10 @@ func titleCase(s string) string {
 	return strings.Join(words, " ")
 }
 
-// ---------- image card renderer ----------
-
-func htmlEsc(s string) string {
-	r := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
-	return r.Replace(s)
-}
-
-func renderSummaryCardHTML(m summaryModel, emoji string) string {
-	e := emojiSets[emoji]
-	t := tierTokens[m.verdict]
-	v := verdicts[m.verdict]
-	vem := verdictEmoji(e, m.verdict)
-	soft := map[string]string{"danger": "rgba(255,107,107,0.10)", "caution": "rgba(255,180,84,0.10)", "safe": "rgba(78,232,142,0.10)"}[m.verdict]
-	bord := map[string]string{"danger": "rgba(255,107,107,0.35)", "caution": "rgba(255,180,84,0.32)", "safe": "rgba(78,232,142,0.30)"}[m.verdict]
-	title := titleCase(v.title)
-
-	var tiles, bar strings.Builder
-	for _, g := range m.groups {
-		fmt.Fprintf(&tiles, `<div style="background:#101215;padding:15px 14px;text-align:center;"><div style="font-size:18px;margin-bottom:4px;">%s</div><div style="font-size:27px;font-weight:700;color:%s;line-height:1;">%d</div><div style="font-size:11px;font-weight:600;color:#878C99;text-transform:uppercase;letter-spacing:.05em;margin-top:5px;">%s</div></div>`,
-			tierEmoji(e, g.key), g.hex, len(g.resources), g.label)
-		fmt.Fprintf(&bar, `<div style="flex:%d;background:%s;"></div>`, len(g.resources), g.hex)
-	}
-
-	var notable strings.Builder
-	shown := 0
-	for _, r := range m.resources {
-		if r.tier == "safe" || shown >= 5 {
-			continue
-		}
-		shown++
-		fmt.Fprintf(&notable, `<div style="display:flex;align-items:center;gap:9px;padding:5px 0;"><span style="font-size:13px;width:16px;text-align:center;">%s</span><span style="font-family:monospace;font-weight:700;font-size:12px;width:12px;text-align:center;color:%s;">%s</span><span style="font-family:monospace;font-size:12px;color:#D7D9DD;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">%s</span><span style="font-size:10.5px;font-weight:600;color:%s;text-transform:uppercase;">(%s)</span></div>`,
-			tierEmoji(e, r.tier), tierTokens[r.tier].hex, r.glyph, htmlEsc(r.short), tierTokens[r.tier].hex, r.action)
-	}
-
-	return fmt.Sprintf(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box}html,body{margin:0;width:508px;background:#101215}body{font-family:Geist,system-ui,sans-serif;padding:28px}</style></head><body>
-<div style="width:452px;background:linear-gradient(168deg,#16181C,#101215 60%%);border:1px solid %s;border-radius:14px;overflow:hidden;">
-<div style="background:%s;border-bottom:1px solid %s;padding:20px 22px;">
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;"><span style="font-size:12.5px;font-weight:600;color:#B5B8C0;">Terraform Plan</span></div>
-<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:34px;">%s</span><div><div style="font-size:23px;font-weight:700;color:%s;line-height:1.1;">%s</div><div style="font-size:12.5px;color:#878C99;margin-top:3px;">%s</div></div></div>
-</div>
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#212327;">%s</div>
-<div style="display:flex;height:6px;">%s</div>
-<div style="padding:16px 20px 12px;"><div style="font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5F6570;margin-bottom:10px;">Notable changes</div>%s</div>
-<div style="display:flex;align-items:center;gap:10px;padding:12px 20px 15px;border-top:1px solid #212327;font-family:monospace;font-size:11px;color:#6E7480;"><span style="color:#878C99;">main</span><span>·</span><span>%d changes</span></div>
-</div></body></html>`,
-		t.hex, soft, bord, vem, t.hex, title, v.sub, tiles.String(), bar.String(), notable.String(), m.counts.total)
-}
-
-// renderCardPNG rasterises the card HTML to a PNG using headless chromium.
-func renderCardPNG(html, outPath string) error {
-	ctx, cancel := chromedp.NewContext(context.Background())
-	defer cancel()
-	ctx, cancel = context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-
-	dataURL := "data:text/html;charset=utf-8;base64," + base64.StdEncoding.EncodeToString([]byte(html))
-	var buf []byte
-	if err := chromedp.Run(ctx,
-		chromedp.EmulateViewport(508, 560),
-		chromedp.Navigate(dataURL),
-		chromedp.Sleep(300*time.Millisecond),
-		chromedp.FullScreenshot(&buf, 100),
-	); err != nil {
-		return err
-	}
-	return os.WriteFile(outPath, buf, 0o644)
-}
-
 // runSummary classifies the plan and renders it in the requested format.
 // It returns the process exit code: 2 when the plan is destructive (Danger),
 // so it can be dropped into CI as a gate.
-func runSummary(r *ponto, format, emoji, output string, interactive bool) (int, error) {
+func runSummary(r *ponto, format, emoji, output, imageFormat string, interactive bool) (int, error) {
 	if _, ok := emojiSets[emoji]; !ok {
 		return 1, fmt.Errorf("invalid --emoji %q: must be dots, signs or none", emoji)
 	}
@@ -580,11 +508,12 @@ func runSummary(r *ponto, format, emoji, output string, interactive bool) (int, 
 	case "markdown":
 		fmt.Print(renderSummaryMarkdown(m, emoji))
 	case "image":
+		ext := "." + imageFormat
 		out := output
-		if !strings.HasSuffix(out, ".png") {
-			out += ".png"
+		if !strings.HasSuffix(out, ext) {
+			out += ext
 		}
-		if err := renderCardPNG(renderSummaryCardHTML(m, emoji), out); err != nil {
+		if err := renderCard(m, emoji, imageFormat, out); err != nil {
 			return 1, fmt.Errorf("unable to render card image: %w", err)
 		}
 		fmt.Fprintf(os.Stderr, "Wrote %s\n", out)

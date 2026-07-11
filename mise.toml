@@ -5,7 +5,7 @@
 #   mise run build  build the binary natively (or `build:docker` for the image)
 
 [tools]
-go = "1.24"       # go.mod (the charm TUI deps require go 1.24)
+go = "1.25"       # go.mod requires go 1.25 (the tdewolff/canvas dependency raised it from 1.24)
 bun = "1.3"       # UI package manager and build runtime (replaces node/npm)
 terraform = "1.5.7" # for running Ponto natively against a Terraform config
 
@@ -108,6 +108,11 @@ run = "go run . summary --working-dir example/random-test"
 [tasks."run:summary-tui-example"]
 description = "Explore the safety-graded plan summary for the bundled random-test example interactively"
 run = "go run . summary --format tui --working-dir example/random-test"
+
+[tasks."run:summary-image-example"]
+description = "Render the safety-graded plan summary card to an image (build/ponto-summary-example.png)"
+# No build:ui dep and no chrome needed: the card renderer is browser-free.
+run = "mkdir -p build && go run . summary --format image --working-dir example/random-test --output build/ponto-summary-example"
 
 [tasks."run:docker"]
 description = "Run the standard Docker image against the current directory"

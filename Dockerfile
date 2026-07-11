@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG BUN_VERSION=1.3
-ARG GO_VERSION=1.24
+ARG GO_VERSION=1.25
 ARG TF_VERSION=1.5.5
 
 # Build UI (bun, no Node)

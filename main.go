@@ -33,6 +33,9 @@ var TRUE = true
 //go:embed ui/dist
 var frontend embed.FS
 
+//go:embed NOTICE
+var noticeText string
+
 type ponto struct {
 	Name             string
 	WorkingDir       string
@@ -195,6 +198,7 @@ func newRootCmd() *cobra.Command {
 	cmd.MarkFlagsMutuallyExclusive("standalone", "gen-image", "tui")
 
 	cmd.AddCommand(newSummaryCmd())
+	cmd.AddCommand(newLicensesCmd())
 
 	// Allow --interactive as an alias for --tui.
 	cmd.Flags().SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
@@ -264,6 +268,23 @@ func buildPonto(cmd *cobra.Command, v *viper.Viper) (ponto, error) {
 	}, nil
 }
 
+// newLicensesCmd is the `ponto licenses` subcommand: it prints the embedded
+// NOTICE, the third-party attribution for the bundled dependencies (including
+// the FreeType-based font rasteriser used by the image export).
+func newLicensesCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:           "licenses",
+		Short:         "Print third-party licence attribution (the NOTICE file)",
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: false,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Fprint(cmd.OutOrStdout(), noticeText)
+			return nil
+		},
+	}
+}
+
 // newSummaryCmd is the `ponto summary` subcommand: a safety-graded plan digest.
 func newSummaryCmd() *cobra.Command {
 	inputFlags := pflag.NewFlagSet("input", pflag.ContinueOnError)
@@ -282,6 +303,7 @@ func newSummaryCmd() *cobra.Command {
 	sumFlags.String("format", "terminal", "Output format: terminal, markdown, image or tui")
 	sumFlags.String("emoji", "dots", "Emoji encoding: dots, signs or none")
 	sumFlags.StringP("output", "o", "ponto-summary", "Base name for the image card PNG (--format image)")
+	sumFlags.String("image-format", "png", "Image format for --format image: png or svg")
 	sumFlags.BoolP("interactive", "i", false, "Explore the terminal summary interactively (alias: --format tui)")
 
 	v := viper.New()
@@ -300,7 +322,11 @@ func newSummaryCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			code, err := runSummary(&r, v.GetString("format"), v.GetString("emoji"), v.GetString("output"), v.GetBool("interactive"))
+			imageFormat := v.GetString("image-format")
+			if v.GetString("format") == "image" && imageFormat != "png" && imageFormat != "svg" {
+				return fmt.Errorf("invalid --image-format %q: must be \"png\" or \"svg\"", imageFormat)
+			}
+			code, err := runSummary(&r, v.GetString("format"), v.GetString("emoji"), v.GetString("output"), imageFormat, v.GetBool("interactive"))
 			if err != nil {
 				return err
 			}

@@ -174,3 +174,18 @@ func TestBuildForest(t *testing.T) {
 		t.Errorf("last child connector = %q, want └-prefixed", got)
 	}
 }
+
+func TestHelpModalCredit(t *testing.T) {
+	out := helpModal(100, 40, "Ponto — Plan Explorer", explorerHelpRows)
+	for _, want := range []string{"FreeType Team", "ponto licenses"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("help modal missing %q", want)
+		}
+	}
+}
+
+func TestLicensesEmbed(t *testing.T) {
+	if !strings.Contains(noticeText, "This software is based in part on the work of the FreeType Team.") {
+		t.Error("embedded NOTICE missing the required FreeType disclaimer")
+	}
+}
