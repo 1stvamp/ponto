@@ -1,0 +1,26 @@
+Ponto NOTICE
+============
+
+Ponto is distributed under the MIT License (see LICENSE) and is a fork of
+Rover by Nguyen Nguyen and contributors.
+
+The Ponto binary bundles third-party software, acknowledged here.
+
+FreeType
+--------
+Font rasterisation uses the Go port of FreeType
+(github.com/golang/freetype and github.com/BurntSushi/freetype-go), under the
+FreeType License. As that license requires for redistribution in binary form:
+
+  This software is based in part on the work of the FreeType Team.
+
+See https://www.freetype.org/ for more information.
+
+Other bundled dependencies
+--------------------------
+- github.com/tdewolff/canvas: MIT License
+- golang.org/x/image: BSD 3-Clause License
+- star-tex.org/x/tex: BSD 3-Clause License
+- codeberg.org/go-pdf/fpdf: MIT License
+
+The full licence text for each module ships with its source distribution.
